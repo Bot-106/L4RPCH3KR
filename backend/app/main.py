@@ -44,7 +44,11 @@ async def debug_config() -> dict:
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:8000"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:8000",
+        "http://100.90.235.28:3000",  # web-phone dev server via Tailscale
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
