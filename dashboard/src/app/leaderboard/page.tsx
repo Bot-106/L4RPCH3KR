@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { api, Event, LeaderboardEntry } from "@/lib/api";
+import { api, apiWsUrl, Event, Flag, LeaderboardEntry, WsEnvelope } from "@/lib/api";
 
 function scoreClass(score: number) {
   if (score >= 0.75) return "score-text-high";
@@ -47,6 +47,42 @@ export default function GlobalLeaderboardPage() {
     const initialEventId = params.get("event_id") ?? "";
     setEventId(initialEventId);
     void load(initialEventId);
+
+    const ws = new WebSocket(apiWsUrl("/ws/phone"));
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ id: crypto.randomUUID(), type: "subscribe_global", ts: new Date().toISOString(), session_id: null, data: {} }));
+    };
+    ws.onmessage = (msg) => {
+      const env = JSON.parse(msg.data as string) as WsEnvelope<Record<string, unknown>>;
+      if (env.type === "session_available" && env.data.session_id) {
+        const sid = String(env.data.session_id);
+        ws.send(JSON.stringify({ id: crypto.randomUUID(), type: "subscribe_session", ts: new Date().toISOString(), session_id: sid, data: { session_id: sid } }));
+      } else if (env.type === "score_update" && typeof env.data.score === "number" && env.data.subject_id) {
+        const subjectId = String(env.data.subject_id);
+        const newScore = Number(env.data.score);
+        setLeaderboard((rows) => {
+          const updated = rows.map((e) =>
+            e.attendee.id === subjectId ? { ...e, larp_score: Math.max(newScore, e.larp_score) } : e
+          );
+          // re-sort: highest larp_score first, then flag_count
+          return [...updated].sort((a, b) => b.larp_score - a.larp_score || b.flag_count - a.flag_count)
+            .map((e, i) => ({ ...e, rank: i + 1 }));
+        });
+      } else if (env.type === "flag_raised" && env.data.flag) {
+        const flag = env.data.flag as Flag;
+        const subjectId = flag.subject_id;
+        if (subjectId) {
+          setLeaderboard((rows) => {
+            const updated = rows.map((e) =>
+              e.attendee.id === subjectId ? { ...e, flag_count: e.flag_count + 1 } : e
+            );
+            return [...updated].sort((a, b) => b.larp_score - a.larp_score || b.flag_count - a.flag_count)
+              .map((e, i) => ({ ...e, rank: i + 1 }));
+          });
+        }
+      }
+    };
+    return () => ws.close();
   }, []);
 
   return (
