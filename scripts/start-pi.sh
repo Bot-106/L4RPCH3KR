@@ -48,7 +48,14 @@ fi
 LOG_FILE="$REPO/pi/larpchekr.log"
 cd "$REPO/pi"
 
-[[ ! -d .venv ]] && { log "ERROR: pi/.venv not found. Run: python3 -m venv .venv && .venv/bin/pip install -r requirements.txt"; exit 1; }
+if [[ ! -d .venv ]]; then
+  log "No .venv found — creating virtual environment..."
+  python3 -m venv .venv
+fi
+if ! .venv/bin/python -c "import dotenv" &>/dev/null 2>&1; then
+  log "Installing dependencies into .venv..."
+  .venv/bin/pip install --quiet -r requirements.txt
+fi
 
 if [[ $FAKE -eq 1 ]]; then
   export LARPCHEKR_FAKE_HARDWARE=1
