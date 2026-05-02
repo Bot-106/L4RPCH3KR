@@ -20,9 +20,12 @@ from app.ws_manager import manager
 
 
 async def process_simulated_utterance(db: AsyncIOMotorDatabase, session_id: str, text: str, speaker: str = "partner", speaker_confidence: float | None = None) -> None:
+    print(f"[ORCH] process_simulated_utterance session_id={session_id} speaker={speaker} text={text[:60]!r}", flush=True)
     session = await db.sessions.find_one({"id": session_id})
     if session is None:
+        print(f"[ORCH] DROPPED — no session document for id={session_id}", flush=True)
         return
+    print(f"[ORCH] session found event_id={session.get('event_id')} subject_id={session.get('subject_id')}", flush=True)
     if not (session.get("subject_id") or session.get("partner_attendee_id")):
         event_id = session.get("event_id")
         resolved = None
@@ -54,6 +57,8 @@ async def process_simulated_utterance(db: AsyncIOMotorDatabase, session_id: str,
         "audio_url": None,
     }
     await db.utterances.insert_one(utterance)
+    phone_count = len(manager.phones.get(session_id, set()))
+    print(f"[ORCH] utterance inserted id={utterance['id']} — relaying to {phone_count} phone subscriber(s)", flush=True)
     await manager.send_phone(session_id, "transcript_update", {"session_id": session_id, "utterances": [serializers.utterance(utterance)]})
 
     claim = await extract_claim(text, utterance["id"]) if speaker in {"partner", "subject"} else None

@@ -180,14 +180,22 @@ async def handle_pi_ws(ws: WebSocket, token: str | None = None) -> None:
             if event_type == "audio_meta":
                 speaker_hint = data.get("speaker_hint")
                 log.info('{"event": "audio_meta", "speaker_hint": "%s", "session_id": "%s", "request_id": "%s"}', speaker_hint, session_id, request_id)
-            if event_type == "browser_transcript" and session_id:
+            if event_type == "browser_transcript":
                 text = str(data.get("text") or "").strip()
                 speaker_from_hint = data.get("speaker_hint") or speaker_hint
-                if text:
+                print(f"[TRANSCRIPT] received session_id={session_id!r} text_len={len(text)} preview={text[:80]!r}", flush=True)
+                if not session_id:
+                    log.warning('{"event": "browser_transcript_no_session", "text_preview": "%s", "request_id": "%s"}', text[:80], request_id)
+                elif text:
                     speaker, confidence = classify_speaker(speaker_from_hint)
-                    log.info('{"event": "browser_transcript", "speaker": "%s", "confidence": %f, "text_len": %d, "text_preview": "%s...", "session_id": "%s", "request_id": "%s"}',
+                    log.warning('{"event": "browser_transcript", "speaker": "%s", "confidence": %f, "text_len": %d, "text_preview": "%s", "session_id": "%s", "request_id": "%s"}',
                         speaker, confidence, len(text), text[:80], session_id, request_id)
-                    await process_simulated_utterance(database(), session_id, text, speaker, confidence)
+                    try:
+                        await process_simulated_utterance(database(), session_id, text, speaker, confidence)
+                        print(f"[TRANSCRIPT] process_simulated_utterance OK session_id={session_id}", flush=True)
+                    except Exception as exc:
+                        log.exception('{"event": "browser_transcript_pipeline_error", "session_id": "%s", "request_id": "%s", "error": "%s"}', session_id, request_id, str(exc))
+                        print(f"[TRANSCRIPT] PIPELINE ERROR: {exc!r}", flush=True)
                 else:
                     log.warning('{"event": "browser_transcript_empty", "session_id": "%s", "request_id": "%s"}', session_id, request_id)
             if event_type == "frame_snapshot" and session_id:
