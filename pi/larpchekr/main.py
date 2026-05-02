@@ -71,6 +71,11 @@ async def main() -> None:
 
     fake = settings.fake_hardware
 
+    # --- Preview server starts immediately so it's visible during pairing ---
+    stop_event = asyncio.Event()
+    preview = PreviewServer(host="0.0.0.0", port=settings.preview_port)
+    preview_task = asyncio.create_task(preview.run(stop_event=stop_event), name="preview_server_early")
+
     # --- Pairing ---
     pairing = PairingManager(
         backend_rest=settings.backend_rest,
@@ -80,8 +85,10 @@ async def main() -> None:
     )
     if not pairing.is_paired():
         log.info("Not paired — running pairing flow")
-        await pairing.pair()
+        preview.set_state("pairing_scanning", "Hold phone QR code up to camera")
+        await pairing.pair(on_frame=preview.update_frame, on_state=preview.set_state)
 
+    preview.set_state("starting", "Initializing hardware...")
     token = settings.pi_token
 
     # --- Hardware ---
@@ -93,7 +100,6 @@ async def main() -> None:
     # --- Subsystems ---
     audio = AudioCapture(fake=fake)
     camera = CameraCapture(fake=fake)
-    preview = PreviewServer(host="0.0.0.0", port=settings.preview_port)
 
     ws = WsClient(
         ws_url=settings.backend_ws,
@@ -105,7 +111,6 @@ async def main() -> None:
     )
 
     led.set_state(LedState.offline)
-    stop_event = asyncio.Event()
 
     def _handle_shutdown(sig: int, frame: object) -> None:
         log.info("shutdown signal %d received", sig)
@@ -138,10 +143,7 @@ async def main() -> None:
             camera.preview_run(on_frame=preview.update_frame, stop_event=stop_event),
             name="camera_preview",
         ),
-        asyncio.create_task(
-            preview.run(stop_event=stop_event),
-            name="preview_server",
-        ),
+        preview_task,
         asyncio.create_task(
             ws.heartbeat_loop(get_buffer_seconds=lambda: buf.buffered_seconds),
             name="heartbeat",
@@ -152,6 +154,7 @@ async def main() -> None:
         ),
     ]
 
+    preview.set_state("running", f"device={settings.device_id}  backend={settings.backend_ws}")
     log.info("All tasks started. Running until stop signal.")
     try:
         done, pending = await asyncio.wait(

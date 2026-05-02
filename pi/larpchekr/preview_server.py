@@ -1,50 +1,111 @@
 """
-MJPEG preview server.
+MJPEG preview server — diagnostic display.
 
-Serves a live camera feed over HTTP so you can watch it in a browser over Tailscale.
+Serves a live camera feed + state overlay over HTTP (viewable over Tailscale).
 
   http://100.125.43.120:8080        -> HTML page with embedded stream
-  http://100.125.43.120:8080/stream -> raw MJPEG stream (for VLC, curl, etc.)
+  http://100.125.43.120:8080/stream -> raw MJPEG (VLC, curl, etc.)
 
-Frames are pushed in by CameraCapture via update_frame(). The server uses one
-asyncio.Queue per connected client so slow clients drop frames without blocking
-the capture loop.
+Frames are pushed by CameraCapture.preview_run() via update_frame().
+State text is set via set_state() — shown as an overlay on every frame,
+and as a generated status JPEG when no camera frame has arrived yet.
 """
 from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from asyncio import StreamReader, StreamWriter
 from collections.abc import Callable
 
 log = logging.getLogger(__name__)
 
-_BOUNDARY = b"frame"
-
 _INDEX_HTML = b"""\
 <!doctype html>
 <html>
 <head>
-  <title>L4RPCH3KR Pi Camera</title>
+  <title>L4RPCH3KR Pi Diagnostic</title>
   <style>
     * { box-sizing: border-box; }
     body {
-      background: #111; color: #ddd; font-family: monospace;
+      background: #0d0d0d; color: #ccc; font-family: monospace;
       display: flex; flex-direction: column; align-items: center;
-      justify-content: center; min-height: 100vh; margin: 0; gap: 1rem;
+      justify-content: center; min-height: 100vh; margin: 0; gap: .75rem;
     }
-    h1   { font-size: .9rem; letter-spacing: .15em; text-transform: uppercase; color: #888; }
-    img  { max-width: min(640px, 100vw); border: 1px solid #333; display: block; }
-    p    { font-size: .75rem; color: #555; }
+    h1  { font-size: .8rem; letter-spacing: .2em; text-transform: uppercase; color: #555; margin: 0; }
+    img { max-width: min(640px, 100vw); border: 1px solid #222; display: block; }
+    p   { font-size: .7rem; color: #444; margin: 0; }
   </style>
 </head>
 <body>
-  <h1>L4RPCH3KR &mdash; Pi Camera Preview</h1>
-  <img src="/stream" alt="camera feed">
-  <p>Live MJPEG &bull; <a href="/stream" style="color:#555">/stream</a></p>
+  <h1>L4RPCH3KR &mdash; Pi Diagnostic</h1>
+  <img src="/stream" alt="diagnostic feed">
+  <p>Live MJPEG &bull; <a href="/stream" style="color:#444">/stream</a></p>
 </body>
 </html>
 """
+
+
+def _make_status_jpeg(state: str, detail: str, elapsed: float | None = None) -> bytes | None:
+    """Generate a plain status frame using cv2/numpy when no camera frame is available."""
+    try:
+        import cv2
+        import numpy as np
+
+        frame = np.zeros((240, 320, 3), dtype=np.uint8)
+        # dim background grid for depth
+        for y in range(0, 240, 20):
+            cv2.line(frame, (0, y), (320, y), (20, 20, 20), 1)
+        for x in range(0, 320, 20):
+            cv2.line(frame, (x, 0), (x, 240), (20, 20, 20), 1)
+
+        color = (0, 220, 80)
+        cv2.putText(frame, state, (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.65, color, 2)
+        if detail:
+            # word-wrap naively at 36 chars
+            words, line, lines = detail.split(), "", []
+            for w in words:
+                if len(line) + len(w) + 1 > 36:
+                    lines.append(line)
+                    line = w
+                else:
+                    line = (line + " " + w).strip()
+            if line:
+                lines.append(line)
+            for i, l in enumerate(lines[:3]):
+                cv2.putText(frame, l, (10, 138 + i * 18), cv2.FONT_HERSHEY_SIMPLEX, 0.38, (160, 160, 160), 1)
+        if elapsed is not None:
+            cv2.putText(frame, f"{elapsed:.0f}s", (270, 220), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (80, 80, 80), 1)
+
+        _, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
+        return bytes(buf)
+    except Exception as exc:
+        log.debug("preview: status JPEG generation failed: %s", exc)
+        return None
+
+
+def add_overlay(frame: object, state: str, detail: str = "") -> object:
+    """
+    Overlay state text onto a cv2 BGR frame in-place.
+    Call from camera/pairing code before encoding to JPEG.
+    """
+    try:
+        import cv2
+
+        h, w = frame.shape[:2]  # type: ignore[union-attr]
+        # semi-transparent dark band at top
+        band = frame.copy()  # type: ignore[union-attr]
+        cv2.rectangle(band, (0, 0), (w, 52), (0, 0, 0), -1)
+        import cv2 as _cv2
+        _cv2.addWeighted(band, 0.65, frame, 0.35, 0, frame)  # type: ignore[call-overload]
+
+        color = (0, 220, 80)
+        cv2.putText(frame, state, (8, 22), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+        if detail:
+            cv2.putText(frame, detail[:55], (8, 44), cv2.FONT_HERSHEY_SIMPLEX, 0.36, (180, 180, 180), 1)
+    except Exception:
+        pass
+    return frame
 
 
 class PreviewServer:
@@ -53,15 +114,46 @@ class PreviewServer:
         self._port = port
         self._latest_jpeg: bytes | None = None
         self._queues: list[asyncio.Queue[bytes | None]] = []
+        self._state = "starting"
+        self._detail = ""
+        self._state_since = time.monotonic()
+
+    def set_state(self, state: str, detail: str = "") -> None:
+        """Update the diagnostic state label shown on every frame."""
+        if state != self._state or detail != self._detail:
+            log.info("preview: state -> %s  %s", state, detail)
+        self._state = state
+        self._detail = detail
+        self._state_since = time.monotonic()
+        # push a status frame immediately so watchers see the change right away
+        jpeg = _make_status_jpeg(state, detail, elapsed=0.0)
+        if jpeg:
+            self._broadcast_sync(jpeg)
 
     def update_frame(self, jpeg_bytes: bytes) -> None:
         """Called by the camera capture loop with a fresh JPEG frame."""
         self._latest_jpeg = jpeg_bytes
+        self._broadcast_sync(jpeg_bytes)
+
+    def _broadcast_sync(self, jpeg_bytes: bytes) -> None:
         for q in list(self._queues):
             try:
                 q.put_nowait(jpeg_bytes)
             except asyncio.QueueFull:
-                pass  # slow client — skip frame rather than block
+                pass
+
+    async def _status_tick(self, stop_event: asyncio.Event) -> None:
+        """
+        Periodically push a generated status JPEG when no camera frames arrive.
+        This keeps the browser stream alive during pairing / boot.
+        """
+        while not stop_event.is_set():
+            await asyncio.sleep(0.5)
+            if self._queues and self._latest_jpeg is None:
+                elapsed = time.monotonic() - self._state_since
+                jpeg = _make_status_jpeg(self._state, self._detail, elapsed)
+                if jpeg:
+                    self._broadcast_sync(jpeg)
 
     async def _handle(self, reader: StreamReader, writer: StreamWriter) -> None:
         try:
@@ -70,7 +162,6 @@ class PreviewServer:
                 return
             parts = request_line.decode(errors="replace").split()
             path = parts[1] if len(parts) >= 2 else "/"
-            # drain request headers
             while True:
                 line = await asyncio.wait_for(reader.readline(), timeout=3)
                 if line in (b"\r\n", b"\n", b""):
@@ -109,8 +200,9 @@ class PreviewServer:
         self._queues.append(q)
 
         # send latest frame immediately so the browser isn't blank on load
-        if self._latest_jpeg:
-            await _write_frame(writer, self._latest_jpeg)
+        seed = self._latest_jpeg or _make_status_jpeg(self._state, self._detail, 0.0)
+        if seed:
+            await _write_frame(writer, seed)
 
         try:
             while True:
@@ -126,11 +218,8 @@ class PreviewServer:
 
     async def run(self, stop_event: asyncio.Event) -> None:
         server = await asyncio.start_server(self._handle, self._host, self._port)
-        log.info(
-            "preview: http://%s:%d  (MJPEG stream at /stream)",
-            self._host,
-            self._port,
-        )
+        log.info("preview: http://%s:%d  (MJPEG at /stream)", self._host, self._port)
+        asyncio.create_task(self._status_tick(stop_event), name="preview_status_tick")
         async with server:
             await stop_event.wait()
         for q in list(self._queues):

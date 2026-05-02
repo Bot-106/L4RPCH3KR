@@ -19,6 +19,7 @@ import json
 import logging
 import os
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 import httpx
@@ -45,25 +46,47 @@ class PairingManager:
     def is_paired(self) -> bool:
         return self._token_path.exists() and self._token_path.stat().st_size > 0
 
-    async def pair(self) -> str:
+    async def pair(
+        self,
+        on_frame: Callable[[bytes], None] | None = None,
+        on_state: Callable[[str, str], None] | None = None,
+    ) -> str:
         """Run the pairing flow; returns the pi_token string."""
         if self._fake:
-            return self._fake_pair()
-        return await self._real_pair()
+            return self._fake_pair(on_state=on_state)
+        return await self._real_pair(on_frame=on_frame, on_state=on_state)
 
-    def _fake_pair(self) -> str:
+    def _fake_pair(self, on_state: Callable[[str, str], None] | None = None) -> str:
         token = os.environ.get("LARPCHEKR_DEV_PAIR_TOKEN", "dev-pair-token-0000")
         log.info("pairing: FAKE mode — using token %s", token)
+        if on_state:
+            on_state("pairing_fake", f"FAKE mode  token: {token}")
         self._save_token(token)
+        if on_state:
+            on_state("paired", f"Token saved: {token}")
         return token
 
-    async def _real_pair(self) -> str:
-        token = self._scan_qr()
+    async def _real_pair(
+        self,
+        on_frame: Callable[[bytes], None] | None = None,
+        on_state: Callable[[str, str], None] | None = None,
+    ) -> str:
+        if on_state:
+            on_state("pairing_scanning", "Hold phone QR code up to camera")
+        token = self._scan_qr(on_frame=on_frame, on_state=on_state)
+        if on_state:
+            on_state("pairing_claiming", "QR found — claiming token from backend...")
         pi_token = await self._claim(token)
         self._save_token(pi_token)
+        if on_state:
+            on_state("paired", "Paired successfully")
         return pi_token
 
-    def _scan_qr(self) -> str:
+    def _scan_qr(
+        self,
+        on_frame: Callable[[bytes], None] | None = None,
+        on_state: Callable[[str, str], None] | None = None,
+    ) -> str:
         try:
             import cv2  # type: ignore[import]
             from pyzbar import pyzbar  # type: ignore[import]
@@ -74,24 +97,49 @@ class PairingManager:
         if not cap.isOpened():
             raise RuntimeError("Cannot open camera for QR scan")
 
-        log.info("pairing: hold the partner phone QR up to the camera …")
+        log.info("pairing: hold the partner phone QR up to the camera ...")
         deadline = time.monotonic() + PAIR_TIMEOUT
+        start = time.monotonic()
+
         try:
             while time.monotonic() < deadline:
                 ok, frame = cap.read()
                 if not ok:
                     continue
+
+                elapsed = time.monotonic() - start
+                remaining = int(deadline - time.monotonic())
+
                 codes = pyzbar.decode(frame)
-                for code in codes:
-                    data = code.data.decode("utf-8", errors="replace")
+                if codes:
+                    data = codes[0].data.decode("utf-8", errors="replace")
                     log.info("pairing: QR scanned: %s", data)
-                    # The QR payload is expected to be the raw pairing token
-                    # (or a JSON blob with a "token" key)
+                    # draw found state on the frame before pushing
+                    if on_frame:
+                        _draw_overlay(frame, "QR FOUND", data[:40], color=(0, 255, 120))
+                        jpeg = _encode_frame(frame)
+                        if jpeg:
+                            on_frame(jpeg)
+                    if on_state:
+                        on_state("pairing_found", f"QR detected: {data[:40]}")
                     try:
                         payload = json.loads(data)
                         return payload["token"]
                     except (json.JSONDecodeError, KeyError):
                         return data.strip()
+
+                # push scanning frame to preview
+                if on_frame:
+                    _draw_overlay(
+                        frame,
+                        "SCANNING FOR QR",
+                        f"Point camera at web-phone  ({remaining}s remaining)",
+                        elapsed=elapsed,
+                    )
+                    jpeg = _encode_frame(frame)
+                    if jpeg:
+                        on_frame(jpeg)
+
                 time.sleep(QR_POLL_INTERVAL)
         finally:
             cap.release()
@@ -126,3 +174,37 @@ class PairingManager:
         except Exception:
             pass
         log.info("pairing: token saved to %s", self._token_path)
+
+
+def _draw_overlay(
+    frame: object,
+    state: str,
+    detail: str = "",
+    elapsed: float | None = None,
+    color: tuple[int, int, int] = (0, 220, 80),
+) -> None:
+    """Draw diagnostic text onto a cv2 BGR frame in-place."""
+    try:
+        import cv2
+
+        h, w = frame.shape[:2]  # type: ignore[union-attr]
+        band = frame.copy()  # type: ignore[union-attr]
+        cv2.rectangle(band, (0, 0), (w, 56), (0, 0, 0), -1)
+        cv2.addWeighted(band, 0.65, frame, 0.35, 0, frame)  # type: ignore[call-overload]
+        cv2.putText(frame, state, (8, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.65, color, 2)
+        if detail:
+            cv2.putText(frame, detail[:60], (8, 46), cv2.FONT_HERSHEY_SIMPLEX, 0.36, (180, 180, 180), 1)
+        if elapsed is not None:
+            cv2.putText(frame, f"{elapsed:.0f}s", (w - 48, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (80, 80, 80), 1)
+    except Exception:
+        pass
+
+
+def _encode_frame(frame: object) -> bytes | None:
+    try:
+        import cv2
+
+        ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
+        return bytes(buf) if ok else None
+    except Exception:
+        return None
