@@ -1,0 +1,23 @@
+
+> larpchekr-dashboard@0.1.0 dev
+> next dev --port 3001
+
+ ⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
+ We detected multiple lockfiles and selected the directory of C:\Users\arnna\package-lock.json as the root directory.
+ To silence this warning, set `outputFileTracingRoot` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+   See https://nextjs.org/docs/app/api-reference/config/next-config-js/output#caveats for more information.
+ Detected additional lockfiles: 
+   * C:\Users\arnna\Desktop\L4RPCH3KR\dashboard\package-lock.json
+
+   ▲ Next.js 15.5.15
+   - Local:        http://localhost:3001
+   - Network:      http://100.76.124.67:3001
+   - Environments: .env.local, .env
+
+ ✓ Starting...
+ ✓ Ready in 2.5s
+   Reload env: .env.local
+   Reload env: .env.local
+   Reload env: .env.local
+   Reload env: .env.local
+   Reload env: .env.local

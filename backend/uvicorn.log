@@ -1,8 +1,99 @@
 INFO:     Will watch for changes in these directories: ['C:\\Users\\arnna\\Desktop\\L4RPCH3KR\\backend']
 INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
-INFO:     Started reloader process [5472] using WatchFiles
-INFO:     Started server process [31188]
+INFO:     Started reloader process [24144] using WatchFiles
+INFO:     Started server process [24900]
 INFO:     Waiting for application startup.
 startup: fixture_mode=False whisper_model=small.en llm_provider=anthropic anthropic_key=False openai_key=True
 INFO:     Application startup complete.
-INFO:     127.0.0.1:60533 - "GET /healthz HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65140 - "GET /auth/magic-link/callback?token=test HTTP/1.1" 200 OK
+C:\Users\arnna\Desktop\L4RPCH3KR\backend\app\routers.py:424: RuntimeWarning: This package (`duckduckgo_search`) has been renamed to `ddgs`! Use `pip install ddgs` instead.
+  with DDGS() as ddgs:
+INFO:     127.0.0.1:65145 - "GET /events/01KQKF8QT36ZD4V4AHCXNSBTRB/attendees/01KQKF8WWD50W66N9YGTDR468N/summary HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in '.venv\Lib\site-packages\ddgs\similarity.py', '.venv\Lib\site-packages\ddgs\engines\bing_news.py', '.venv\Lib\site-packages\ddgs\engines\yandex.py', '.venv\Lib\site-packages\ddgs\engines\__init__.py', '.venv\Lib\site-packages\ddgs\dht\__init__.py', '.venv\Lib\site-packages\ddgs\engines\bing.py', '.venv\Lib\site-packages\ddgs\api_server\dht_service.py', '.venv\Lib\site-packages\ddgs\engines\bing_images.py', '.venv\Lib\site-packages\ddgs\engines\mojeek.py', '.venv\Lib\site-packages\ddgs\http_client.py', '.venv\Lib\site-packages\ddgs\engines\google.py', '.venv\Lib\site-packages\ddgs\ddgs.py', '.venv\Lib\site-packages\ddgs\api_server\mcp.py', '.venv\Lib\site-packages\ddgs\engines\yahoo_news.py', '.venv\Lib\site-packages\ddgs\engines\duckduckgo.py', '.venv\Lib\site-packages\ddgs\__init__.py', '.venv\Lib\site-packages\ddgs\engines\duckduckgo_videos.py', '.venv\Lib\site-packages\ddgs\engines\duckduckgo_images.py', '.venv\Lib\site-packages\ddgs\engines\annasarchive.py', '.venv\Lib\site-packages\ddgs\dht\types.py', '.venv\Lib\site-packages\ddgs\api_server\api.py', '.venv\Lib\site-packages\ddgs\engines\grokipedia.py', '.venv\Lib\site-packages\ddgs\exceptions.py', '.venv\Lib\site-packages\ddgs\utils.py', '.venv\Lib\site-packages\ddgs\base.py', '.venv\Lib\site-packages\ddgs\dht\libp2p_client.py', '.venv\Lib\site-packages\ddgs\engines\wikipedia.py', '.venv\Lib\site-packages\ddgs\engines\duckduckgo_news.py', '.venv\Lib\site-packages\ddgs\engines\yahoo.py', '.venv\Lib\site-packages\ddgs\dht\cache.py', '.venv\Lib\site-packages\ddgs\api_server\__init__.py', '.venv\Lib\site-packages\ddgs\cli.py', '.venv\Lib\site-packages\ddgs\engines\brave.py', '.venv\Lib\site-packages\ddgs\results.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [24900]
+sys:1: ResourceWarning: Unclosed MongoClient opened at:
+  File "<string>", line 1, in <module>
+  File "C:\Program Files\Python312\Lib\multiprocessing\spawn.py", line 122, in spawn_main
+    exitcode = _main(fd, parent_sentinel)
+  File "C:\Program Files\Python312\Lib\multiprocessing\spawn.py", line 135, in _main
+    return self._bootstrap(parent_sentinel)
+  File "C:\Program Files\Python312\Lib\multiprocessing\process.py", line 314, in _bootstrap
+    self.run()
+  File "C:\Program Files\Python312\Lib\multiprocessing\process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\arnna\Desktop\L4RPCH3KR\backend\.venv\Lib\site-packages\uvicorn\_subprocess.py", line 80, in subprocess_started
+    target(sockets=sockets)
+  File "C:\Users\arnna\Desktop\L4RPCH3KR\backend\.venv\Lib\site-packages\uvicorn\server.py", line 65, in run
+    return asyncio.run(self.serve(sockets=sockets))
+  File "C:\Program Files\Python312\Lib\asyncio\runners.py", line 194, in run
+    return runner.run(main)
+  File "C:\Program Files\Python312\Lib\asyncio\runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+  File "C:\Program Files\Python312\Lib\asyncio\base_events.py", line 651, in run_until_complete
+    self.run_forever()
+  File "C:\Program Files\Python312\Lib\asyncio\base_events.py", line 618, in run_forever
+    self._run_once()
+  File "C:\Program Files\Python312\Lib\asyncio\base_events.py", line 1951, in _run_once
+    handle._run()
+  File "C:\Program Files\Python312\Lib\asyncio\events.py", line 84, in _run
+    self._context.run(self._callback, *self._args)
+  File "C:\Users\arnna\Desktop\L4RPCH3KR\backend\.venv\Lib\site-packages\uvicorn\server.py", line 69, in serve
+    await self._serve(sockets)
+  File "C:\Users\arnna\Desktop\L4RPCH3KR\backend\.venv\Lib\site-packages\uvicorn\server.py", line 76, in _serve
+    config.load()
+  File "C:\Users\arnna\Desktop\L4RPCH3KR\backend\.venv\Lib\site-packages\uvicorn\config.py", line 434, in load
+    self.loaded_app = import_from_string(self.app)
+  File "C:\Users\arnna\Desktop\L4RPCH3KR\backend\.venv\Lib\site-packages\uvicorn\importer.py", line 19, in import_from_string
+    module = importlib.import_module(module_str)
+  File "C:\Program Files\Python312\Lib\importlib\__init__.py", line 90, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+  File "<frozen importlib._bootstrap>", line 1381, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1354, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1325, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 929, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 994, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "C:\Users\arnna\Desktop\L4RPCH3KR\backend\app\main.py", line 10, in <module>
+    from app.db import database
+  File "<frozen importlib._bootstrap>", line 1354, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1325, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 929, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 994, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "C:\Users\arnna\Desktop\L4RPCH3KR\backend\app\db.py", line 8, in <module>
+    client = AsyncIOMotorClient(settings.mongo_url)
+  File "C:\Users\arnna\Desktop\L4RPCH3KR\backend\.venv\Lib\site-packages\motor\core.py", line 171, in __init__
+    delegate = self.__delegate_class__(*args, **kwargs)
+Call MongoClient.close() to safely shut down your client and free up resources.
+WARNING:  WatchFiles detected changes in 'app\routers.py'. Reloading...
+Process SpawnProcess-2:
+Traceback (most recent call last):
+  File "C:\Program Files\Python312\Lib\multiprocessing\process.py", line 314, in _bootstrap
+    self.run()
+  File "C:\Program Files\Python312\Lib\multiprocessing\process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\arnna\Desktop\L4RPCH3KR\backend\.venv\Lib\site-packages\uvicorn\_subprocess.py", line 73, in subprocess_started
+    sys.stdin = os.fdopen(stdin_fileno)
+                ^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen os>", line 1037, in fdopen
+  File "<frozen codecs>", line 309, in __init__
+KeyboardInterrupt
+INFO:     Started server process [7416]
+INFO:     Waiting for application startup.
+startup: fixture_mode=False whisper_model=small.en llm_provider=anthropic anthropic_key=False openai_key=True
+INFO:     Application startup complete.
+INFO:     100.90.235.28:50159 - "GET /healthz HTTP/1.1" 200 OK
+INFO:     100.90.235.28:50162 - "GET /healthz HTTP/1.1" 200 OK
+INFO:     100.90.235.28:50171 - "GET /healthz HTTP/1.1" 200 OK
+INFO:     100.90.235.28:50172 - "GET /healthz HTTP/1.1" 200 OK
+INFO:     100.90.235.28:50178 - "GET /healthz HTTP/1.1" 200 OK
+INFO:     100.90.235.28:50204 - "GET /healthz HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'app\routers.py'. Reloading...
+INFO:     Started server process [14636]
+INFO:     Waiting for application startup.
+startup: fixture_mode=False whisper_model=base.en llm_provider=anthropic anthropic_key=True openai_key=True cors_origins=http://localhost:3000,http://localhost:3001,http://100.76.124.67:3000,http://100.76.124.67:3001,http://100.90.235.28:3000,http://100.90.235.28:3001
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)

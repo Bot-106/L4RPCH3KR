@@ -13,7 +13,10 @@ async def current_user(
         if user:
             return user
         raise HTTPException(status_code=401, detail={"error": {"code": "auth_invalid", "message": "missing bearer token"}})
-    payload = decode_token(authorization.removeprefix("Bearer "))
+    try:
+        payload = decode_token(authorization.removeprefix("Bearer "))
+    except Exception as exc:
+        raise HTTPException(status_code=401, detail={"error": {"code": "auth_invalid", "message": "invalid bearer token"}}) from exc
     user = await db.users.find_one({"id": payload["sub"]})
     if not user:
         raise HTTPException(status_code=401, detail={"error": {"code": "auth_invalid", "message": "unknown user"}})

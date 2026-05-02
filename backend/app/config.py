@@ -1,9 +1,14 @@
+from pathlib import Path
+
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
+
+
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=ENV_FILE, extra="ignore")
 
     mongo_url: str = "mongodb://localhost:27017"
     mongo_db: str = "larpchekr"
@@ -19,8 +24,8 @@ class Settings(BaseSettings):
         return v
 
     # Comma-separated list of allowed CORS origins.
-    # Default covers the web-phone and dashboard on the Tailscale backend host.
-    cors_origins: str = "http://100.76.124.67:3000,http://100.76.124.67:3001"
+    # Default covers local dev plus web-phone/dashboard on the Tailscale backend host.
+    cors_origins: str = "http://localhost:3000,http://localhost:3001,http://100.76.124.67:3000,http://100.76.124.67:3001"
 
     def cors_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
