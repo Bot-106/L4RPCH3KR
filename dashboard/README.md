@@ -91,8 +91,8 @@ Reads from `dashboard/.env.local`:
 
 | Var | Required | Example |
 |-----|----------|---------|
-| `NEXT_PUBLIC_API_BASE` | yes | `http://localhost:8000` |
-| `DASHBOARD_BASE_URL` | yes | `http://localhost:3000` |
+| `NEXT_PUBLIC_API_BASE` | yes | `http://100.76.124.67:8000` |
+| `DASHBOARD_BASE_URL` | yes | `http://100.76.124.67:3001` |
 
 ## Local setup
 

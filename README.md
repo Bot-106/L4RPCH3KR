@@ -7,7 +7,7 @@ A wearable + app system that detects claims people make during hackathon convers
 Three subsystems plus an organizer dashboard:
 
 - **Pi capture device** — chest-worn Raspberry Pi 5 with USB camera/mic and a haptic motor. Captures audio + occasional video frames, streams to backend, vibrates when a flag fires.
-- **Phone app** — React Native (iOS + Android). Onboarding, live mode (status pill + flag cards), recap screen.
+- **Web phone app** — Progressive web app (Vite + React + TypeScript). Runs in any mobile or desktop browser on the Tailscale mesh. Onboarding, live mode (status pill + flag cards), recap screen.
 - **Backend** — FastAPI server. The brain: transcription, speaker separation, claim extraction, profile comparison, scoring, websocket fan-out. MongoDB.
 - **Organizer dashboard** — Next.js. CSV import of attendees with profile-link enrichment, CRUD, export.
 
@@ -30,7 +30,8 @@ Three subsystems plus an organizer dashboard:
                         │ REST          │ REST
                         ▼               ▼
                 ┌──────────────┐  ┌──────────────────┐
-                │ Phone (RN)   │  │ Dashboard (Next) │
+                │ Web-phone    │  │ Dashboard (Next) │
+                │ (Vite PWA)   │  │                  │
                 └──────────────┘  └──────────────────┘
 ```
 
@@ -55,7 +56,7 @@ Three websocket connections per active session: Pi↔backend, phone↔backend (o
 | Diarization | **speechbrain ECAPA-TDNN** speaker embeddings + cosine match | Lightweight; pairs well with onboarding voice calibration. |
 | Claim extraction | **LLM with structured output** (Anthropic Claude Sonnet 4.6 or OpenAI gpt-4.1-mini, structured JSON via tool-use) | Casual speech is too messy for rules+NER. Latency budget allows ~1.5s. |
 | Pi | **Python 3.11**, `sounddevice`, `opencv-python`, `websockets`, `RPi.GPIO` | Single language for the device team, well-supported on Pi 5. |
-| Phone | **React Native + TypeScript** (bare RN, not Expo Go — we need native haptics + BLE-ish reliability for Pi pairing flows) | One codebase, iOS+Android. Bare RN gives us the dev-client flexibility without Expo's prebuild costs. Reconsider Expo dev client if onboarding pain dominates. |
+| Web phone | **Vite + React 18 + TypeScript** (PWA, runs in any mobile browser on the Tailscale mesh) | Eliminates native build toolchain. Runs on any device that can join the tailnet. No app store required for demo. |
 | Dashboard | **Next.js 15 (App Router) + TypeScript** | Same TS toolchain as phone for shared types. SSR not strictly required but useful for the org-internal dashboard. |
 | Auth | **Magic link** for attendees (email-only) + **GitHub OAuth** as a separate connect-step in onboarding | Hackathon-grade simplicity. GitHub login conflates auth with profile-linking; we want them separate. |
 | Deploy (demo) | Backend + dashboard on Fly.io or Railway, MongoDB managed | One region, ship fast. |
@@ -101,7 +102,7 @@ To unblock parallel work, build in this order:
 |--------|------|
 | Engineer A | `pi/` — audio/camera capture, haptic, enclosure-fit, BLE/QR pairing client, on-device VAD |
 | Engineer B | `backend/` + `dashboard/` — server end-to-end, including organizer tools. Shared deploy target. |
-| Engineer C | `phone/` — RN app, all three flows (onboarding, live, recap) |
+| Engineer C | `web-phone/` — PWA, all three flows (onboarding, live, recap) |
 | Designer | `design/` — Figma source, design tokens export, asset export, all locked-scope screens |
 
 If contracts shift such that B has too much, peel `dashboard/` off to a fourth engineer or have C take it on once the phone live mode stabilizes.
@@ -157,7 +158,7 @@ L4RPCH3KR/
 ├── pi/                        ← Engineer A
 ├── backend/                   ← Engineer B
 ├── dashboard/                 ← Engineer B
-├── phone/                     ← Engineer C
+├── web-phone/                 ← Engineer C (PWA, replaces legacy phone/)
 ├── design/                    ← Designer
 └── infra/                     ← deploy notes
 ```

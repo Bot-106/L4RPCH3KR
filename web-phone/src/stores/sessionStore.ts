@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Session, Flag, Claim, Utterance } from '@/contracts/types'
+import type { Session, Flag, Claim, Utterance } from '@/contracts/generated'
 
 export type WsStatus = 'disconnected' | 'connecting' | 'connected' | 'reconnecting'
 export type SessionStatus = 'armed' | 'active' | 'ended' | null

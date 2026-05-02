@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { User } from '@/contracts/types'
+import type { User } from '@/contracts/generated'
 import { setJwt, clearJwt, getJwt } from '@/lib/auth'
 
 interface AuthState {

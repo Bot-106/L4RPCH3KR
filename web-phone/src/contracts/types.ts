@@ -1,136 +1,22 @@
-// Hand-written from contracts/data-models.md and contracts/rest-api.md
+// UI-only types and API response shapes.
+// Entity types (User, Attendee, Session, etc.) are generated from JSON Schemas —
+// import them from '@/contracts/generated' instead.
 
-export interface User {
-  id: string
-  email: string
-  display_name: string
-  created_at: string
-  voice_calibration_id: string | null
-  github_login: string | null
-}
+import type {
+  User,
+  Attendee,
+  Session,
+  Utterance,
+  Claim,
+  Flag,
+  VoiceCalibration,
+} from '@/contracts/generated'
 
-export interface Event {
-  id: string
-  name: string
-  starts_at: string
-  ends_at: string
-  consent_jurisdiction: string
-  retention_days: number
-  created_by_user_id: string
-}
+export type { VoiceCalibration }
 
-export interface Attendee {
-  id: string
-  event_id: string
-  user_id: string | null
-  full_name: string
-  email: string
-  headline: string | null
-  linkedin_url: string | null
-  github_login: string | null
-  resume_url: string | null
-  photo_url: string | null
-  consented_to_recording: boolean
-  imported_at: string
-}
-
-export interface ProfileFacts {
-  languages?: Array<{ name: string; evidence: string; confidence: number; loc?: number }>
-  experience?: Array<{ company: string; title: string; start: string; end?: string }>
-  education?: Array<{ school: string; degree: string; field: string; end?: string }>
-  projects?: Array<{ name: string; stars?: number; url?: string }>
-}
-
-export interface Profile {
-  id: string
-  attendee_id: string
-  source: 'github' | 'linkedin' | 'resume'
-  fetched_at: string
-  data: Record<string, unknown>
-  facts: ProfileFacts
-}
-
-export type PartnerConsentStatus = 'pending' | 'granted' | 'denied'
-export type SessionStatus = 'armed' | 'active' | 'ended'
-
-export interface Session {
-  id: string
-  event_id: string
-  self_user_id: string
-  partner_attendee_id: string | null
-  partner_consent_status: PartnerConsentStatus
-  started_at: string
-  ended_at: string | null
-  pi_device_id: string
-}
-
-export type Speaker = 'self' | 'partner' | 'unknown'
-
-export interface Utterance {
-  id: string
-  session_id: string
-  speaker: Speaker
-  speaker_confidence: number
-  started_at: string
-  ended_at: string
-  text: string
-  audio_url: string | null
-}
-
-export type ClaimKind =
-  | 'language_experience'
-  | 'employment'
-  | 'education'
-  | 'project'
-  | 'credential'
-  | 'quantitative'
-
-export type HedgeLevel = 'none' | 'weak' | 'strong'
-
-export interface Claim {
-  id: string
-  utterance_id: string
-  kind: ClaimKind
-  subject: string
-  predicate: string
-  value: Record<string, unknown>
-  hedge: HedgeLevel
-  extraction_confidence: number
-  text_span: string
-}
-
-export type FlagSeverity = 'low' | 'medium' | 'high'
-
-export interface Flag {
-  id: string
-  claim_id: string
-  profile_id: string
-  severity: FlagSeverity
-  score_delta: number
-  verified_text: string
-  confidence: number
-  created_at: string
-  disputed: boolean
-  dispute_reason: string | null
-}
-
-export interface VoiceCalibration {
-  id: string
-  user_id: string
-  sample_audio_url: string
-  created_at: string
-}
-
-export interface Pairing {
-  token: string
-  issuer_user_id: string
-  expires_at: string
-  consumed_by_user_id: string | null
-  consumed_at: string | null
-  qr_url?: string
-}
-
-// API response shapes
+// ─── API response shapes ─────────────────────────���────────────────────────────
+// These are phone-specific wrappers around entity types and are NOT in the JSON
+// schemas; they must stay here.
 
 export interface MagicLinkResponse {
   ok: boolean
@@ -177,19 +63,13 @@ export interface FlagDisputeResponse {
   flag: Flag
 }
 
-// WebSocket envelope and event types
-
-export interface WsEnvelope<T = unknown> {
-  id: string
-  type: string
-  ts: string
-  session_id: string | null
-  data: T
-}
+// ─── WebSocket payload types (backend → phone) ───────────────────────────��───
+// These wrap entity types into the per-event `data` payloads.
+// They are phone-specific and are NOT top-level JSON schemas.
 
 export interface WsSessionStatus {
   session_id: string
-  status: SessionStatus
+  status: 'armed' | 'active' | 'ended'
   partner: Attendee | null
 }
 

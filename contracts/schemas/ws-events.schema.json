@@ -2,7 +2,25 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://larpchekr.app/schemas/ws-events.schema.json",
   "title": "WsEventPayloads",
-  "description": "Per-`type` payload schemas. The full message wraps these in WsEnvelope.",
+  "description": "Per-`type` payload schemas. The full message wraps these in WsEnvelope. The anyOf at top-level exists solely so json-schema-to-typescript emits all $defs as named interfaces.",
+  "anyOf": [
+    { "$ref": "#/$defs/PiHello" },
+    { "$ref": "#/$defs/PhoneHello" },
+    { "$ref": "#/$defs/AudioMeta" },
+    { "$ref": "#/$defs/FrameSnapshot" },
+    { "$ref": "#/$defs/Heartbeat" },
+    { "$ref": "#/$defs/HapticPulse" },
+    { "$ref": "#/$defs/RecordingIndicator" },
+    { "$ref": "#/$defs/SubscribeSession" },
+    { "$ref": "#/$defs/ConsumePairingQr" },
+    { "$ref": "#/$defs/PairingQr" },
+    { "$ref": "#/$defs/TranscriptUpdate" },
+    { "$ref": "#/$defs/ClaimDetected" },
+    { "$ref": "#/$defs/FlagRaised" },
+    { "$ref": "#/$defs/ScoreUpdate" },
+    { "$ref": "#/$defs/SessionStatus" },
+    { "$ref": "#/$defs/ErrorPayload" }
+  ],
   "$defs": {
     "PiHello": {
       "type": "object",

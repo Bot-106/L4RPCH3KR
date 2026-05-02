@@ -21,7 +21,8 @@ import logging
 import math
 import struct
 import time
-from typing import Awaitable, Callable
+from collections.abc import Awaitable, Callable
+from datetime import UTC
 
 log = logging.getLogger(__name__)
 
@@ -52,11 +53,11 @@ def _make_audio_frame_header(ms: int) -> bytes:
 
 def _make_audio_meta_envelope(session_id: str | None) -> dict:
     import uuid
-    from datetime import datetime, timezone
+    from datetime import datetime
     return {
         "id": uuid.uuid4().hex,
         "type": "audio_meta",
-        "ts": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "ts": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "session_id": session_id,
         "data": {
             "sample_rate": SAMPLE_RATE,
@@ -163,8 +164,8 @@ class AudioCapture:
         stop_event: asyncio.Event,
     ) -> None:
         try:
-            import sounddevice as sd  # type: ignore[import]
             import numpy as np  # type: ignore[import]
+            import sounddevice as sd  # type: ignore[import]
         except ImportError as exc:
             log.error("audio: sounddevice not available (%s) — audio disabled", exc)
             await stop_event.wait()
@@ -173,7 +174,7 @@ class AudioCapture:
         loop = asyncio.get_running_loop()
         queue: asyncio.Queue[bytes] = asyncio.Queue(maxsize=64)
 
-        def callback(indata: "np.ndarray", frames: int, t: object, status: object) -> None:
+        def callback(indata: np.ndarray, frames: int, t: object, status: object) -> None:
             if status:
                 log.debug("sounddevice status: %s", status)
             # indata is float32 in [-1, 1]; convert to int16
@@ -197,7 +198,7 @@ class AudioCapture:
             while not stop_event.is_set():
                 try:
                     pcm = await asyncio.wait_for(queue.get(), timeout=0.5)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     continue
 
                 session_id = get_session_id()

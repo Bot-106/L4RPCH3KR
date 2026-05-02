@@ -37,22 +37,15 @@ build/
 .expo/
 .expo-shared/
 
-# React Native
-ios/Pods/
-ios/build/
-android/build/
-android/app/build/
-android/.gradle/
-*.jks
-*.keystore
-!debug.keystore
-
 # Test artifacts
 coverage/
 .nyc_output/
 
-# Generated
-contracts/generated/
+# Generated types — committed for reliable demo builds (no on-the-fly codegen in CI).
+# The gitignore pattern contracts/generated/ only matches root-level paths; subsystem
+# generated dirs (backend/app/contracts/generated/, etc.) are intentionally tracked.
+# To switch to untracked-and-regenerate: git rm -r --cached '**/contracts/generated/'
+# and add:  **/contracts/generated/
 
 # Audio/video captures (never commit)
 *.wav

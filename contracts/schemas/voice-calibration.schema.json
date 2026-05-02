@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://larpchekr.app/schemas/voice-calibration.schema.json",
+  "title": "VoiceCalibration",
+  "description": "Speaker calibration record. The embedding field is server-side only and never sent to clients in REST responses; clients only need id, user_id, sample_audio_url, and created_at.",
+  "type": "object",
+  "required": ["id", "user_id", "created_at"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "$ref": "_common.schema.json#/$defs/Ulid" },
+    "user_id": { "$ref": "_common.schema.json#/$defs/Ulid" },
+    "sample_audio_url": {
+      "oneOf": [{ "type": "string", "format": "uri" }, { "type": "null" }]
+    },
+    "created_at": { "$ref": "_common.schema.json#/$defs/IsoTimestamp" }
+  }
+}

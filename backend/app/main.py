@@ -1,8 +1,9 @@
 import json
 import logging
+import uuid
 from datetime import datetime, timezone
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import serializers
@@ -23,17 +24,22 @@ app = FastAPI(title="L4RPCH3KR API", version=settings.version)
 @app.on_event("startup")
 async def _log_config() -> None:
     log.warning(
-        "startup: fixture_mode=%s whisper_model=%s llm_provider=%s anthropic_key=%s openai_key=%s",
+        "startup: fixture_mode=%s whisper_model=%s llm_provider=%s anthropic_key=%s openai_key=%s cors_origins=%s",
         settings.fixture_mode,
         settings.whisper_model,
         settings.llm_provider,
         bool(settings.anthropic_api_key),
         bool(settings.openai_api_key),
+        settings.cors_origins,
     )
 
 
 @app.get("/debug/config")
 async def debug_config() -> dict:
+    """Debug endpoint — only active in fixture_mode to prevent leaking config state in production."""
+    if not settings.fixture_mode:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="not found")
     return {
         "fixture_mode": settings.fixture_mode,
         "whisper_model": settings.whisper_model,
@@ -44,11 +50,7 @@ async def debug_config() -> dict:
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:8000",
-        "http://100.90.235.28:3000",  # web-phone dev server via Tailscale
-    ],
+    allow_origins=settings.cors_origins_list(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -67,7 +69,13 @@ async def healthz() -> dict[str, str | bool]:
     return {"ok": mongo_status == "ok", "mongo": mongo_status, "version": settings.version}
 
 
-async def handle_phone_ws(ws: WebSocket, user_token: str | None = None) -> None:
+async def handle_phone_ws(ws: WebSocket, token: str | None = None) -> None:
+    request_id = str(uuid.uuid4())[:8]
+    log.info(
+        '{"event": "ws_connect", "endpoint": "/ws/phone", "token_present": %s, "request_id": "%s"}',
+        bool(token),
+        request_id,
+    )
     await ws.accept()
     try:
         while True:
@@ -75,6 +83,12 @@ async def handle_phone_ws(ws: WebSocket, user_token: str | None = None) -> None:
             event_type = message.get("type")
             data = message.get("data") or {}
             session_id = data.get("session_id") or message.get("session_id")
+            log.info(
+                '{"event": "ws_message", "endpoint": "/ws/phone", "event_type": "%s", "session_id": "%s", "request_id": "%s"}',
+                event_type,
+                session_id,
+                request_id,
+            )
             if event_type == "subscribe_session" and session_id:
                 await manager.subscribe_phone(session_id, ws)
                 await ws.send_json(envelope("session_status", {"session_id": session_id, "status": "active", "partner": None}, session_id))
@@ -92,16 +106,17 @@ async def handle_phone_ws(ws: WebSocket, user_token: str | None = None) -> None:
 
 
 @app.websocket("/ws/phone")
-async def phone_ws(ws: WebSocket) -> None:
-    await handle_phone_ws(ws)
+async def phone_ws(ws: WebSocket, token: str | None = Query(default=None)) -> None:
+    await handle_phone_ws(ws, token)
 
 
-@app.websocket("/ws/phone/{user_token}")
-async def phone_ws_token(ws: WebSocket, user_token: str) -> None:
-    await handle_phone_ws(ws, user_token)
-
-
-async def handle_pi_ws(ws: WebSocket, device_token: str | None = None) -> None:
+async def handle_pi_ws(ws: WebSocket, token: str | None = None) -> None:
+    request_id = str(uuid.uuid4())[:8]
+    log.info(
+        '{"event": "ws_connect", "endpoint": "/ws/pi", "token_present": %s, "request_id": "%s"}',
+        bool(token),
+        request_id,
+    )
     await ws.accept()
     manager.pis.add(ws)
     session_id: str | None = None
@@ -132,6 +147,12 @@ async def handle_pi_ws(ws: WebSocket, device_token: str | None = None) -> None:
             payload = json.loads(message["text"])
             event_type = payload.get("type")
             data = payload.get("data") or {}
+            log.info(
+                '{"event": "ws_message", "endpoint": "/ws/pi", "event_type": "%s", "session_id": "%s", "request_id": "%s"}',
+                event_type,
+                session_id,
+                request_id,
+            )
             if payload.get("session_id"):
                 session_id = payload["session_id"]
             if data.get("session_id"):
@@ -154,20 +175,21 @@ async def handle_pi_ws(ws: WebSocket, device_token: str | None = None) -> None:
                     if match and not match.ambiguous:
                         attendee = await database().attendees.find_one({"id": match.attendee_id})
                         await database().sessions.update_one({"id": session_id}, {"$set": {"subject_id": match.attendee_id, "partner_attendee_id": match.attendee_id}})
-                        payload = {"session_id": session_id, "attendee_id": match.attendee_id, "attendee": serializers.attendee(attendee) if attendee else None, "confidence": match.confidence, "method": match.method}
-                        await manager.send_phone(session_id, "subject_identified", payload)
-                        await ws.send_json(envelope("subject_resolved", payload, session_id))
+                        pi_payload = {"session_id": session_id, "attendee_id": match.attendee_id, "attendee": serializers.attendee(attendee) if attendee else None, "confidence": match.confidence, "method": match.method}
+                        await manager.send_phone(session_id, "partner_identified", pi_payload)
+                        # subject_resolved is a backend→pi event not in contracts — see REVIEW.md
+                        await ws.send_json(envelope("subject_resolved", pi_payload, session_id))
                         identified = True
                     else:
-                        payload = {"session_id": session_id, "attendee_id": None, "attendee": None, "confidence": 0.0, "method": "profile_picture_similarity", "reason": "no_profile_picture_match"}
-                        await manager.send_phone(session_id, "subject_identified", payload)
-                        await ws.send_json(envelope("subject_resolved", payload, session_id))
+                        pi_payload = {"session_id": session_id, "attendee_id": None, "attendee": None, "confidence": 0.0, "method": "profile_picture_similarity", "reason": "no_profile_picture_match"}
+                        await manager.send_phone(session_id, "partner_identified", pi_payload)
+                        await ws.send_json(envelope("subject_resolved", pi_payload, session_id))
                 elif event_id:
                     await face_matcher.refresh(database(), event_id)
                     reason = "no_comparable_profile_pictures" if not face_matcher.attendee_ids else "no_face_detected_in_snapshot"
-                    payload = {"session_id": session_id, "attendee_id": None, "attendee": None, "confidence": 0.0, "method": "profile_picture_similarity", "reason": reason}
-                    await manager.send_phone(session_id, "subject_identified", payload)
-                    await ws.send_json(envelope("subject_resolved", payload, session_id))
+                    pi_payload = {"session_id": session_id, "attendee_id": None, "attendee": None, "confidence": 0.0, "method": "profile_picture_similarity", "reason": reason}
+                    await manager.send_phone(session_id, "partner_identified", pi_payload)
+                    await ws.send_json(envelope("subject_resolved", pi_payload, session_id))
             if event_type == "session_end" and session_id and audio_buffer:
                 text = transcribe_pcm_frame(bytes(audio_buffer), sample_rate=audio_sample_rate)
                 audio_buffer.clear()
@@ -186,10 +208,5 @@ async def handle_pi_ws(ws: WebSocket, device_token: str | None = None) -> None:
 
 
 @app.websocket("/ws/pi")
-async def pi_ws(ws: WebSocket) -> None:
-    await handle_pi_ws(ws)
-
-
-@app.websocket("/ws/pi/{device_token}")
-async def pi_ws_token(ws: WebSocket, device_token: str) -> None:
-    await handle_pi_ws(ws, device_token)
+async def pi_ws(ws: WebSocket, token: str | None = Query(default=None)) -> None:
+    await handle_pi_ws(ws, token)

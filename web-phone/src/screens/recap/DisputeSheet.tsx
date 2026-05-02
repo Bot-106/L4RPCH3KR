@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/Button'
 import { disputeFlag } from '@/lib/api'
-import type { Flag } from '@/contracts/types'
+import type { Flag } from '@/contracts/generated'
 
 interface DisputeSheetProps {
   flag: Flag

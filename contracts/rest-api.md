@@ -1,6 +1,6 @@
 # REST API
 
-Base URL (dev): `http://localhost:8000`
+Base URL (dev): `http://<TAILSCALE_BACKEND_HOST>:8000` (set `TAILSCALE_BACKEND_HOST` to `100.76.124.67` or the backend's current Tailscale IP)
 Base URL (prod): `https://api.larpchekr.app`
 
 All requests/responses are JSON unless noted. All times ISO-8601 UTC.

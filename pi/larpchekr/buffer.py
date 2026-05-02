@@ -18,8 +18,8 @@ import logging
 import struct
 import threading
 from collections import deque
+from collections.abc import Iterator
 from dataclasses import dataclass, field
-from typing import Iterator
 
 log = logging.getLogger(__name__)
 

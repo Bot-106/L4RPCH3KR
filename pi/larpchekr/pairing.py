@@ -101,7 +101,11 @@ class PairingManager:
     async def _claim(self, token: str) -> str:
         """POST /pi/claim; returns the pi_token from the response."""
         url = f"{self._rest}/pi/claim"
-        payload = {"token": token, "device_id": self._device_id}
+        payload = {
+            "pair_token": token,
+            "device_id": self._device_id,
+            "firmware_version": "0.1.0",
+        }
         log.info("pairing: POSTing to %s", url)
         async with httpx.AsyncClient(timeout=15) as client:
             resp = await client.post(url, json=payload)

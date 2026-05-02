@@ -7,6 +7,7 @@ import httpx
 import websockets
 
 from app.db import database
+from app.pipeline.fixtures import LARP_TEXT, TRUTHFUL_TEXT
 
 
 def env(event_type: str, data: dict, session_id: str | None = None) -> str:
@@ -43,7 +44,7 @@ async def clear_session_outputs(session_id: str) -> None:
 
 async def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--base-url", default="http://127.0.0.1:8000")
+    parser.add_argument("--base-url", default="http://100.76.124.67:8000")
     parser.add_argument("--session-id", default=None)
     args = parser.parse_args()
 
@@ -53,14 +54,14 @@ async def main() -> None:
     ws_base = args.base_url.replace("http://", "ws://").replace("https://", "wss://")
     flag_events = []
 
-    async with websockets.connect(f"{ws_base}/ws/phone/dev") as phone:
+    async with websockets.connect(f"{ws_base}/ws/phone?token=dev") as phone:
         await phone.send(env("phone_hello", {"user_id": "01HX0000000000000000000000", "app_version": "verify"}))
         await phone.recv()
         await phone.send(env("subscribe_session", {"session_id": session_id}, session_id))
         await phone.recv()
 
         subject_events = []
-        async with websockets.connect(f"{ws_base}/ws/pi/dev-pi") as pi:
+        async with websockets.connect(f"{ws_base}/ws/pi?token=dev-pi") as pi:
             await pi.send(env("pi_hello", {"device_id": "sim-pi", "firmware_version": "0.1.0", "battery_pct": 95}))
             await pi.recv()
             await pi.send(env("session_start", {"session_id": session_id}, session_id))
@@ -69,12 +70,17 @@ async def main() -> None:
             subject_resolved = json.loads(await pi.recv())
             if subject_resolved.get("type") == "subject_resolved":
                 subject_events.append(subject_resolved)
-            await pi.send(env("audio_meta", {"sample_rate": 16000, "encoding": "pcm_s16le", "channels": 1, "frame_ms": 250, "speaker_hint": "partner"}, session_id))
-            await pi.recv()
-            await pi.send(b"truthful utterance frame")
-            await pi.send(b"larp utterance frame")
+            # Use browser_transcript to bypass the 96 kB PCM buffer gate.
+            # The server echoes each browser_transcript AFTER process_simulated_utterance
+            # completes (which includes sending flag_raised to the phone WS), so awaiting
+            # the Pi echo guarantees flag_raised is already in the phone queue.
+            await pi.send(env("browser_transcript", {"text": TRUTHFUL_TEXT, "speaker_hint": "partner", "session_id": session_id}, session_id))
+            await asyncio.wait_for(pi.recv(), timeout=10)  # echo = pipeline done for utterance 1
+            await pi.send(env("browser_transcript", {"text": LARP_TEXT, "speaker_hint": "partner", "session_id": session_id}, session_id))
+            await asyncio.wait_for(pi.recv(), timeout=10)  # echo = pipeline done for utterance 2 + flag sent
 
-            deadline = asyncio.get_running_loop().time() + 8
+            # Drain any queued phone events to pick up flag_raised.
+            deadline = asyncio.get_running_loop().time() + 4
             while asyncio.get_running_loop().time() < deadline:
                 try:
                     raw = await asyncio.wait_for(phone.recv(), timeout=0.5)

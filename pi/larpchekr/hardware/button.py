@@ -42,7 +42,10 @@ class Button:
             # SIGUSR1 simulates a button press
             try:
                 signal.signal(signal.SIGUSR1, self._on_signal)
-                log.info("button: FAKE mode — send SIGUSR1 (kill -USR1 %d) to simulate press", __import__("os").getpid())
+                log.info(
+                    "button: FAKE mode — send SIGUSR1 (kill -USR1 %d) to simulate press",
+                    __import__("os").getpid(),
+                )
             except (OSError, ValueError):
                 # signal can fail in non-main threads; ignore
                 pass

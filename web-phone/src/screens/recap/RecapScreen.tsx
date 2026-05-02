@@ -6,7 +6,7 @@ import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { Button } from '@/components/Button'
 import { getSessionRecap } from '@/lib/api'
 import { colors } from '@/theme/tokens'
-import type { Flag, Claim, Utterance } from '@/contracts/types'
+import type { Flag, Claim, Utterance } from '@/contracts/generated'
 
 interface SelectedFlag {
   flag: Flag

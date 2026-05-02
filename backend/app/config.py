@@ -17,6 +17,14 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             return v.strip()
         return v
+
+    # Comma-separated list of allowed CORS origins.
+    # Default covers the web-phone and dashboard on the Tailscale backend host.
+    cors_origins: str = "http://100.76.124.67:3000,http://100.76.124.67:3001"
+
+    def cors_origins_list(self) -> list[str]:
+        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
     llm_provider: str = "openai"
     anthropic_api_key: str = ""
     openai_api_key: str = ""
@@ -26,6 +34,15 @@ class Settings(BaseSettings):
     whisper_device: str = "auto"
     whisper_compute_type: str = "auto"
     asr_chunk_seconds: float = 3.0
+
+    # Auth / email
+    magic_link_from: str = "noreply@larpchekr.app"
+    resend_api_key: str = ""
+    github_oauth_client_id: str = ""
+    github_oauth_client_secret: str = ""
+
+    # Storage
+    storage_backend: str = "local"
 
     linkedin_email: str = ""
     linkedin_password: str = ""

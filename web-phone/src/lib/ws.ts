@@ -1,6 +1,12 @@
-import type { WsEnvelope } from '@/contracts/types'
+import type { WsEnvelope } from '@/contracts/generated'
 
-const WS_BASE = import.meta.env.VITE_WS_BASE ?? 'ws://localhost:8000'
+const _wsBase = import.meta.env.VITE_WS_BASE as string | undefined
+if (!_wsBase) {
+  if (!import.meta.env.DEV) {
+    throw new Error('VITE_WS_BASE is not set. Copy .env.example to .env and set your Tailscale backend IP.')
+  }
+}
+const WS_BASE = _wsBase ?? 'ws://localhost:8000'
 
 type Handler = (data: unknown) => void
 
@@ -37,7 +43,7 @@ export class WSClient {
       type,
       ts: new Date().toISOString(),
       session_id: sessionId ?? this.sessionId,
-      data,
+      data: data as Record<string, unknown>,
     }
     this.ws.send(JSON.stringify(envelope))
   }

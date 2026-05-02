@@ -4,8 +4,8 @@ Two WS endpoints, one envelope shape, three directions.
 
 ## Endpoints
 
-- `wss://api.larpchekr.app/ws/pi` — Pi clients. Auth: `?token=<pi_pairing_token>`.
-- `wss://api.larpchekr.app/ws/phone` — phone clients. Auth: `?token=<user_jwt>`.
+- `wss://api.larpchekr.app/ws/pi` — Pi clients. Auth: `?token=<pi_token>` query param (Pi token issued at `/pi/claim`).
+- `wss://api.larpchekr.app/ws/phone` — phone/web-phone clients. Auth: `?token=<user_jwt>` query param.
 
 Phones never connect to the Pi endpoint and vice versa.
 
@@ -39,6 +39,7 @@ Binary frames (audio PCM) skip the envelope and are sent as raw `bytes`. The mos
 | `session_end` | session ended on Pi (manual button) | `{ session_id, reason }` |
 | `heartbeat` | every 10s | `{ battery_pct, cpu_temp_c, buffer_seconds }` |
 | `buffer_drain_start` / `buffer_drain_end` | bracketing post-outage replay | `{ session_id, buffered_seconds }` |
+| `browser_transcript` | **browser/dev-mode only** — browser sends a text utterance directly instead of PCM audio; used when running the web-phone as a soft-Pi in the laptop demo flow | `{ text, speaker_hint?: "self"\|"partner"\|"unknown", session_id }` |
 
 ## Backend → Pi
 
@@ -47,6 +48,7 @@ Binary frames (audio PCM) skip the envelope and are sent as raw `bytes`. The mos
 | `haptic_pulse` | a flag was raised | `{ severity: "low" | "medium" | "high", pattern: [ms_on, ms_off, ...] }` |
 | `recording_indicator` | partner consent state changes | `{ state: "off" | "armed" | "recording" }` — drives Pi LED |
 | `session_ack` | confirms `session_start` | `{ session_id }` |
+| `subject_resolved` | response to `frame_snapshot` — face-match result | `{ session_id, attendee_id: ulid\|null, attendee: Attendee\|null, confidence: float, method: string, reason?: string }` |
 | `error` | client did something wrong | `{ code, message }` |
 
 ## Phone → backend

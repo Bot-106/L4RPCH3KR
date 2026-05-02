@@ -20,11 +20,11 @@ Each subsystem generates its own typed bindings from the schemas. No subsystem h
 | Subsystem | Tool | Output path |
 |-----------|------|-------------|
 | Backend (Python) | `datamodel-code-generator` | `backend/app/contracts/generated/` |
-| Phone (TS) | `json-schema-to-typescript` | `phone/src/contracts/generated/` |
+| Web-phone (TS) | `json-schema-to-typescript` | `web-phone/src/contracts/generated/` |
 | Dashboard (TS) | `json-schema-to-typescript` | `dashboard/src/contracts/generated/` |
 | Pi (Python) | `datamodel-code-generator` (subset only — only WS events it sends/receives) | `pi/larpchekr/contracts/generated/` |
 
-Each subsystem's `Makefile` or `package.json` should expose a `make contracts` / `npm run contracts` task that regenerates from `../contracts/schemas/`. **Don't hand-edit generated files.** They're gitignored (see root `.gitignore`).
+Each subsystem's `Makefile` or `package.json` should expose a `make contracts` / `npm run contracts` task that regenerates from `../contracts/schemas/`. **Don't hand-edit generated files.** For demo reliability they are committed to git (not gitignored), but they must be regenerated any time a schema changes. Run `npm run contracts` / `make contracts` in every consumer after any schema edit.
 
 ## Versioning
 

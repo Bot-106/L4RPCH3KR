@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { DisputeSheet } from './DisputeSheet'
 import { colors } from '@/theme/tokens'
-import type { Flag, Claim, Utterance } from '@/contracts/types'
+import type { Flag, Claim, Utterance } from '@/contracts/generated'
 
 interface FlagDetailProps {
   flag: Flag

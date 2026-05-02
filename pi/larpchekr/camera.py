@@ -13,7 +13,8 @@ import asyncio
 import base64
 import logging
 import time
-from typing import Awaitable, Callable
+from collections.abc import Awaitable, Callable
+from datetime import UTC
 
 log = logging.getLogger(__name__)
 
@@ -25,13 +26,15 @@ JPEG_QUALITY = 75
 SendEnvelopeFn = Callable[[dict], Awaitable[None]]
 
 
-def _make_snapshot_envelope(image_b64: str, width: int, height: int, session_id: str | None) -> dict:
+def _make_snapshot_envelope(
+    image_b64: str, width: int, height: int, session_id: str | None
+) -> dict:
     import uuid
-    from datetime import datetime, timezone
+    from datetime import datetime
     return {
         "id": uuid.uuid4().hex,
         "type": "frame_snapshot",
-        "ts": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "ts": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "session_id": session_id,
         "data": {
             "image_b64": image_b64,
@@ -41,10 +44,9 @@ def _make_snapshot_envelope(image_b64: str, width: int, height: int, session_id:
     }
 
 
-def _encode_jpeg(frame: "object") -> tuple[bytes, int, int]:
+def _encode_jpeg(frame: object) -> tuple[bytes, int, int]:
     """Encode a numpy BGR frame to JPEG bytes; resize if needed."""
     import cv2  # type: ignore[import]
-    import numpy as np  # type: ignore[import]
 
     h, w = frame.shape[:2]  # type: ignore[union-attr]
     if w > MAX_WIDTH or h > MAX_HEIGHT:
@@ -58,7 +60,7 @@ def _encode_jpeg(frame: "object") -> tuple[bytes, int, int]:
     return bytes(buf), w, h
 
 
-def _make_fake_frame() -> "object":
+def _make_fake_frame() -> object:
     """Generate a test frame: a gradient image with timestamp text."""
     import cv2  # type: ignore[import]
     import numpy as np  # type: ignore[import]
@@ -94,7 +96,6 @@ class CameraCapture:
         if self._fake:
             frame = _make_fake_frame()
         else:
-            import cv2  # type: ignore[import]
             ok, frame = self._cap.read()  # type: ignore[union-attr]
             if not ok:
                 log.warning("camera: read failed — using fake frame")

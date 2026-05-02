@@ -25,10 +25,10 @@ class Settings:
 
     def __init__(self) -> None:
         self.backend_ws = os.environ.get(
-            "LARPCHEKR_BACKEND_WS", "ws://localhost:8000/ws/pi"
+            "LARPCHEKR_BACKEND_WS", "ws://100.76.124.67:8000/ws/pi"
         )
         self.backend_rest = os.environ.get(
-            "LARPCHEKR_BACKEND_REST", "http://localhost:8000"
+            "LARPCHEKR_BACKEND_REST", "http://100.76.124.67:8000"
         )
         self.pi_token_path = Path(
             os.environ.get("LARPCHEKR_PI_TOKEN_PATH", "/etc/larpchekr/pi_token")
@@ -47,7 +47,7 @@ class Settings:
             raise RuntimeError(
                 f"Pi token not found at {self.pi_token_path}. "
                 "Run scripts/pair.py first, or set LARPCHEKR_FAKE_HARDWARE=1 for dev."
-            )
+            ) from None
 
     def configure_logging(self) -> None:
         logging.basicConfig(

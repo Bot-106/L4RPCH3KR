@@ -88,7 +88,7 @@ async def compare_claim(db: AsyncIOMotorDatabase, session: dict, claim: dict) ->
             return None  # no data to contradict against
         if subject in known:
             return None  # claim checks out
-        verified_text = f"No evidence of {subject} found in verified GitHub profile (known: {', '.join(sorted(known))})."
+        verified_text = f"GitHub/profile facts show no {subject.capitalize()} in verified profile (known: {', '.join(sorted(known))})."
 
     elif kind == "employment":
         known = {(item.get("company") or "").lower() for item in facts.get("employment", [])}

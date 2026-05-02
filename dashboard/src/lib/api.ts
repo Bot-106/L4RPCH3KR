@@ -145,6 +145,10 @@ export type AttendeeSummary = {
   larp_score?: number | null;
 };
 
+// NEXT_PUBLIC_API_BASE must be set at deploy time to point to the backend host.
+// In local development (`npm run dev`) it falls back to http://localhost:8000.
+// In production, omitting it means all API calls will silently target localhost —
+// set NEXT_PUBLIC_API_BASE=http://100.76.124.67:8000 (or your Tailscale IP) in .env.local.
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
 
 export function apiWsUrl(path: string) {

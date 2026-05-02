@@ -116,7 +116,7 @@ export function LiveScreen() {
         kind: 'language_experience',
         subject: sev === 'low' ? 'Rust' : sev === 'medium' ? 'Google' : 'MIT',
         predicate: sev === 'low' ? 'experience_years' : sev === 'medium' ? 'worked_at' : 'graduated_from',
-        value: {},
+        value: { years: 0 },
         hedge: 'none',
         extraction_confidence: 0.91,
         text_span: sev === 'low'

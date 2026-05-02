@@ -16,7 +16,7 @@ def env(event_type: str, data: dict, session_id: str | None = None) -> str:
 async def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--session-id", required=True)
-    parser.add_argument("--url", default="ws://localhost:8000/ws/pi/dev-pi")
+    parser.add_argument("--url", default="ws://100.76.124.67:8000/ws/pi?token=dev-token")
     parser.add_argument("--wav", default=None, help="Optional WAV path. The MVP stub splits it into two utterance frames deterministically.")
     args = parser.parse_args()
 

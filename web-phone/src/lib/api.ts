@@ -1,10 +1,10 @@
 import axios from 'axios'
 import type { AxiosInstance } from 'axios'
 import { getJwt, clearJwt } from './auth'
+import type { User } from '@/contracts/generated'
 import type {
   MagicLinkResponse,
   AuthCallbackResponse,
-  User,
   VoiceCalibrationResponse,
   PiPairResponse,
   PairingCreateResponse,
@@ -14,7 +14,13 @@ import type {
   FlagDisputeResponse,
 } from '@/contracts/types'
 
-const BASE_URL = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000'
+const _apiBase = import.meta.env.VITE_API_BASE as string | undefined
+if (!_apiBase) {
+  if (!import.meta.env.DEV) {
+    throw new Error('VITE_API_BASE is not set. Copy .env.example to .env and set your Tailscale backend IP.')
+  }
+}
+const BASE_URL = _apiBase ?? 'http://localhost:8000'
 
 const client: AxiosInstance = axios.create({
   baseURL: BASE_URL,

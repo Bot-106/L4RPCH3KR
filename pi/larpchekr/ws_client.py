@@ -18,8 +18,9 @@ import asyncio
 import json
 import logging
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Awaitable, Callable
+from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
+from typing import Any
 
 log = logging.getLogger(__name__)
 
@@ -34,7 +35,7 @@ HEARTBEAT_INTERVAL = 10.0  # seconds
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _new_id() -> str:
@@ -57,9 +58,9 @@ class WsClient:
         ws_url: str,
         token: str,
         device_id: str,
-        buffer: "object",  # larpchekr.buffer.RingBuffer
-        led: "object",  # larpchekr.hardware.led.LEDController
-        haptic: "object",  # larpchekr.hardware.haptic.HapticDriver
+        buffer: object,  # larpchekr.buffer.RingBuffer
+        led: object,  # larpchekr.hardware.led.LEDController
+        haptic: object,  # larpchekr.hardware.haptic.HapticDriver
         on_session_start_ack: Callable[[str], Awaitable[None]] | None = None,
     ) -> None:
         self._url = f"{ws_url}?token={token}"
@@ -116,7 +117,9 @@ class WsClient:
         await self.send_envelope(_envelope("session_start", {"session_id": session_id}, session_id))
 
     async def send_session_end(self, session_id: str, reason: str = "manual") -> None:
-        await self.send_envelope(_envelope("session_end", {"session_id": session_id, "reason": reason}, session_id))
+        await self.send_envelope(
+            _envelope("session_end", {"session_id": session_id, "reason": reason}, session_id)
+        )
 
     def stop(self) -> None:
         self._stop.set()
@@ -135,7 +138,12 @@ class WsClient:
                 log.warning("ws: disconnected (%s) — reconnecting in %.1fs", exc, backoff)
             finally:
                 self._connected.clear()
-                self._led.set_state("offline")
+                # If we're stopping altogether → red (offline).
+                # If we're mid-retry → yellow (degraded, still buffering).
+                if self._stop.is_set():
+                    self._led.set_state("offline")
+                else:
+                    self._led.set_state("degraded")
 
             if self._stop.is_set():
                 break
@@ -153,7 +161,11 @@ class WsClient:
             # Send hello
             await ws.send(json.dumps(_envelope(
                 "pi_hello",
-                {"device_id": self._device_id, "firmware_version": FIRMWARE_VERSION, "battery_pct": None},
+                {
+                    "device_id": self._device_id,
+                    "firmware_version": FIRMWARE_VERSION,
+                    "battery_pct": None,
+                },
             )))
 
             # Drain ring buffer if non-empty
@@ -207,7 +219,6 @@ class WsClient:
 
     async def _receiver(self, ws: Any) -> None:
         """Receive and dispatch inbound messages."""
-        import websockets  # type: ignore[import]
 
         async for raw in ws:
             if isinstance(raw, bytes):
@@ -219,7 +230,10 @@ class WsClient:
             except json.JSONDecodeError:
                 log.warning("ws: non-JSON message: %.80r", raw)
                 continue
-            await self._dispatch(msg)
+            try:
+                await self._dispatch(msg)
+            except Exception:
+                log.exception("ws: error dispatching message type=%s", msg.get("type"))
 
     async def _dispatch(self, msg: dict) -> None:
         msg_type = msg.get("type")
@@ -227,7 +241,10 @@ class WsClient:
         envelope_session_id = msg.get("session_id")
 
         if msg_type == "recording_indicator":
-            state = data.get("state", "off")
+            state = data.get("state")
+            if state not in ("off", "armed", "recording"):
+                log.warning("ws: recording_indicator unknown state=%r — ignoring", state)
+                return
             self._led.set_state(state)
             if state == "recording" and envelope_session_id:
                 self._session_id = envelope_session_id
