@@ -12,6 +12,12 @@ log = logging.getLogger(__name__)
 
 PROFILE_IMAGE_RE = re.compile(r"https://media\.licdn\.com/[^\s\"'<>]+profile-displayphoto[^\s\"'<>]+")
 OG_IMAGE_RE = re.compile(r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']', re.IGNORECASE)
+REQUEST_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Referer": "https://www.linkedin.com/",
+}
 
 
 @dataclass
@@ -83,7 +89,7 @@ class FaceMatcher:
     async def _embedding_from_url(self, url: str) -> list[float] | None:
         try:
             async with httpx.AsyncClient(timeout=6.0, follow_redirects=True) as client:
-                response = await client.get(url, headers={"User-Agent": "Mozilla/5.0 L4RPCH3KR demo profile-image resolver"})
+                response = await client.get(url, headers=REQUEST_HEADERS)
             response.raise_for_status()
             content_type = response.headers.get("content-type", "")
             if "image" not in content_type and not url.lower().split("?")[0].endswith((".jpg", ".jpeg", ".png", ".webp")):
@@ -95,8 +101,8 @@ class FaceMatcher:
             return None
 
     def _best_linkedin_image_from_html(self, body: str) -> str | None:
-        body = html.unescape(body)
-        urls = PROFILE_IMAGE_RE.findall(body)
+        body = html.unescape(body).replace("\\u0026", "&")
+        urls = [url.rstrip(",") for url in PROFILE_IMAGE_RE.findall(body)]
         og_match = OG_IMAGE_RE.search(body)
         if og_match:
             urls.append(html.unescape(og_match.group(1)))
@@ -109,12 +115,23 @@ class FaceMatcher:
                 return int(match.group(1)) * int(match.group(2))
             return 0
 
-        return max(urls, key=score)
+        return max(set(urls), key=score)
+
+    def _linkedin_image_from_stored_value(self, row: dict) -> str | None:
+        socials = row.get("socials") or {}
+        values = [row.get("linkedin_url"), socials.get("linkedin")]
+        for value in values:
+            if not isinstance(value, str) or not value.strip():
+                continue
+            image_url = self._best_linkedin_image_from_html(value)
+            if image_url:
+                return image_url
+        return None
 
     async def _profile_image_url_from_linkedin_page(self, url: str) -> str | None:
         try:
             async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as client:
-                response = await client.get(url, headers={"User-Agent": "Mozilla/5.0 L4RPCH3KR demo profile-image resolver"})
+                response = await client.get(url, headers=REQUEST_HEADERS)
             response.raise_for_status()
             content_type = response.headers.get("content-type", "")
             if "html" not in content_type and "text" not in content_type:
@@ -131,6 +148,24 @@ class FaceMatcher:
             return url
         return None
 
+    async def resolve_profile_image(self, db: AsyncIOMotorDatabase, attendee: dict) -> tuple[str | None, list[float] | None, str | None]:
+        image_url = self._linkedin_image_from_stored_value(attendee)
+        if image_url:
+            embedding = await self._embedding_from_url(image_url)
+            return image_url, embedding, "linkedin_img_snippet"
+
+        linkedin_url = self._profile_page_url(attendee)
+        if not linkedin_url:
+            return None, None, None
+        image_url = await self._profile_image_url_from_linkedin_page(linkedin_url)
+        if not image_url:
+            return None, None, None
+
+        embedding = await self._embedding_from_url(image_url)
+        if not embedding:
+            return image_url, None, "linkedin_profile_page"
+        return image_url, embedding, "linkedin_profile_page"
+
     async def refresh(self, db: AsyncIOMotorDatabase, event_id: str) -> None:
         rows = await db.attendees.find({"event_id": event_id, "deleted_at": None}).to_list(None)
         self.event_id = event_id
@@ -138,20 +173,15 @@ class FaceMatcher:
         self.missing_profile_images = 0
         embeddings: list[list[float]] = []
         for row in rows:
-            embedding = row.get("profile_image_embedding")
+            embedding = row.get("profile_image_embedding") if row.get("profile_image_source") in {"linkedin_profile_page", "linkedin_img_snippet"} else None
             if not embedding:
-                image_url = row.get("profile_pic_url") or row.get("photo_url")
-                if not image_url:
-                    linkedin_url = self._profile_page_url(row)
-                    if linkedin_url:
-                        image_url = await self._profile_image_url_from_linkedin_page(linkedin_url)
-                        if image_url:
-                            await db.attendees.update_one({"id": row["id"]}, {"$set": {"profile_pic_url": image_url, "photo_url": image_url}})
+                image_url, embedding, source = await self.resolve_profile_image(db, row)
                 if image_url:
-                    embedding = await self._embedding_from_url(image_url)
+                    update = {"profile_pic_url": image_url, "photo_url": image_url, "profile_image_source_url": image_url, "profile_image_source": source}
                     if embedding:
-                        await db.attendees.update_one({"id": row["id"]}, {"$set": {"profile_image_embedding": embedding, "profile_image_source_url": image_url}})
-                else:
+                        update["profile_image_embedding"] = embedding
+                    await db.attendees.update_one({"id": row["id"]}, {"$set": update})
+                if not image_url:
                     self.missing_profile_images += 1
             if embedding:
                 self.attendee_ids.append(row["id"])

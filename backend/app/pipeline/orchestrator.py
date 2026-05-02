@@ -44,7 +44,7 @@ async def process_simulated_utterance(db: AsyncIOMotorDatabase, session_id: str,
     await db.utterances.insert_one(utterance)
     await manager.send_phone(session_id, "transcript_update", {"session_id": session_id, "utterances": [serializers.utterance(utterance)]})
 
-    claim = extract_claim(text, utterance["id"]) if speaker in {"partner", "subject"} else None
+    claim = await extract_claim(text, utterance["id"]) if speaker in {"partner", "subject"} else None
     if not claim:
         return
     await db.claims.insert_one(claim)

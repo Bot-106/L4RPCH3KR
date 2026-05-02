@@ -102,6 +102,10 @@ async def handle_pi_ws(ws: WebSocket, device_token: str | None = None) -> None:
             payload = json.loads(message["text"])
             event_type = payload.get("type")
             data = payload.get("data") or {}
+            if payload.get("session_id"):
+                session_id = payload["session_id"]
+            if data.get("session_id"):
+                session_id = data["session_id"]
             if event_type == "audio_meta":
                 speaker_hint = data.get("speaker_hint")
                 audio_sample_rate = int(data.get("sample_rate_hz") or audio_sample_rate)
@@ -134,10 +138,6 @@ async def handle_pi_ws(ws: WebSocket, device_token: str | None = None) -> None:
                     payload = {"session_id": session_id, "attendee_id": None, "attendee": None, "confidence": 0.0, "method": "profile_picture_similarity", "reason": reason}
                     await manager.send_phone(session_id, "subject_identified", payload)
                     await ws.send_json(envelope("subject_resolved", payload, session_id))
-            if payload.get("session_id"):
-                session_id = payload["session_id"]
-            if data.get("session_id"):
-                session_id = data["session_id"]
             if event_type == "session_end" and session_id and audio_buffer:
                 text = transcribe_pcm_frame(bytes(audio_buffer), sample_rate=audio_sample_rate)
                 audio_buffer.clear()

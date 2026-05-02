@@ -1,41 +1,125 @@
+import logging
 from datetime import datetime
 
+import httpx
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app import serializers
 
+log = logging.getLogger(__name__)
+
+_SEVERITY = {
+    "language_experience": ("medium", 0.35),
+    "employment": ("high", 0.50),
+    "education": ("medium", 0.35),
+    "project": ("low", 0.20),
+    "credential": ("high", 0.50),
+    "quantitative": ("low", 0.20),
+}
+
+
+async def _fetch_github_languages(github_login: str) -> set[str]:
+    """Return the set of lowercase language names found in the user's public GitHub repos."""
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(
+                f"https://api.github.com/users/{github_login}/repos",
+                params={"per_page": 100, "type": "owner"},
+                headers={"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"},
+            )
+            if resp.status_code != 200:
+                return set()
+            repos = resp.json()
+            return {r["language"].lower() for r in repos if r.get("language")}
+    except Exception as exc:
+        log.warning("compare: github fetch failed for %s: %s", github_login, exc)
+        return set()
+
+
+async def _get_or_build_profile(db: AsyncIOMotorDatabase, attendee: dict) -> dict:
+    subject_id = attendee["id"]
+    profile = await db.profiles.find_one({"attendee_id": subject_id})
+    if profile:
+        return profile
+
+    verified_profile = attendee.get("verified_profile") or {}
+    facts: dict = dict(verified_profile)
+
+    # Hydrate language facts from GitHub if not already present
+    github_login = attendee.get("github_login") or (attendee.get("socials") or {}).get("github")
+    if github_login and not facts.get("languages"):
+        langs = await _fetch_github_languages(github_login)
+        if langs:
+            facts["languages"] = [{"name": lang, "evidence": "github", "confidence": 0.9} for lang in langs]
+            log.info("compare: fetched %d languages from GitHub for %s", len(langs), github_login)
+
+    profile = {
+        "id": serializers.new_id(),
+        "attendee_id": subject_id,
+        "source": "github",
+        "fetched_at": datetime.utcnow(),
+        "facts": facts,
+    }
+    await db.profiles.insert_one(profile)
+    return profile
+
 
 async def compare_claim(db: AsyncIOMotorDatabase, session: dict, claim: dict) -> dict | None:
     subject_id = session.get("subject_id") or session.get("partner_attendee_id")
-    if claim["subject"].lower() != "rust" or not subject_id:
+    if not subject_id:
         return None
-    profile = await db.profiles.find_one({"attendee_id": subject_id})
+
+    kind = claim.get("kind") or claim.get("claim_type") or "language_experience"
+    subject = (claim.get("subject") or "").lower().strip()
+    if not subject:
+        return None
+
     attendee = await db.attendees.find_one({"id": subject_id})
-    verified_profile = (attendee or {}).get("verified_profile") or {}
-    if profile is None:
-        profile = {
-            "id": serializers.new_id(),
-            "attendee_id": subject_id,
-            "source": "github",
-            "fetched_at": datetime.utcnow(),
-            "data": {},
-            "facts": verified_profile or {"languages": [{"name": "python", "evidence": "github", "confidence": 0.8, "loc": 5000}]},
-        }
-        await db.profiles.insert_one(profile)
-    languages = {item.get("name", "").lower() for item in (profile.get("facts") or {}).get("languages", [])}
-    if "rust" in languages:
+    if not attendee:
         return None
+
+    profile = await _get_or_build_profile(db, attendee)
+    facts = profile.get("facts") or {}
+    severity, score_delta = _SEVERITY.get(kind, ("low", 0.20))
+
+    if kind == "language_experience":
+        known = {item.get("name", "").lower() for item in facts.get("languages", [])}
+        if not known:
+            return None  # no data to contradict against
+        if subject in known:
+            return None  # claim checks out
+        verified_text = f"No evidence of {subject} found in verified GitHub profile (known: {', '.join(sorted(known))})."
+
+    elif kind == "employment":
+        known = {(item.get("company") or "").lower() for item in facts.get("employment", [])}
+        if not known:
+            return None
+        if subject in known:
+            return None
+        verified_text = f"No record of employment at {subject} in verified profile."
+
+    elif kind == "education":
+        known = {(item.get("school") or "").lower() for item in facts.get("education", [])}
+        if not known:
+            return None
+        if subject in known:
+            return None
+        verified_text = f"No record of {subject} education in verified profile."
+
+    else:
+        return None
+
     return {
         "id": serializers.new_id(),
         "claim_id": claim["id"],
         "session_id": session["id"],
         "subject_id": subject_id,
         "profile_id": profile["id"],
-        "verified_against": "github.languages",
-        "severity": "medium",
-        "score_delta": 0.42,
-        "verified_text": "GitHub/profile facts show no Rust evidence for this attendee.",
-        "confidence": 0.88,
+        "verified_against": f"profile.{kind}",
+        "severity": severity,
+        "score_delta": score_delta,
+        "verified_text": verified_text,
+        "confidence": 0.85,
         "created_at": datetime.utcnow(),
         "disputed": False,
         "dispute_status": "none",

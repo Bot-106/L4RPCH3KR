@@ -12,6 +12,7 @@ from app import serializers
 from app.auth import create_token, decode_token
 from app.db import get_db
 from app.deps import current_user, organizer_user
+from app.identity.face_matcher import face_matcher
 from app.pipeline.score import compute_score, score_label
 
 router = APIRouter()
@@ -335,6 +336,23 @@ async def update_attendee(event_id: str, attendee_id: str, payload: dict, db: As
     await db.attendees.update_one({"id": attendee_id, "event_id": event_id}, {"$set": update})
     attendee = await db.attendees.find_one({"id": attendee_id})
     return {"attendee": serializers.attendee(attendee)}
+
+
+@router.post("/events/{event_id}/attendees/{attendee_id}/profile-photo")
+async def fetch_attendee_profile_photo(event_id: str, attendee_id: str, db: AsyncIOMotorDatabase = Depends(get_db), _: dict = Depends(organizer_user)) -> dict:
+    attendee = await db.attendees.find_one({"id": attendee_id, "event_id": event_id, "deleted_at": None})
+    if attendee is None:
+        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "attendee not found"}})
+    image_url, embedding, source = await face_matcher.resolve_profile_image(db, attendee)
+    if not image_url:
+        raise HTTPException(status_code=404, detail={"error": {"code": "profile_photo_not_found", "message": "no LinkedIn profile photo could be resolved"}})
+    update = {"profile_pic_url": image_url, "photo_url": image_url, "profile_image_source_url": image_url, "profile_image_source": source or "linkedin_profile_page", "processing_status": "ready"}
+    if embedding:
+        update["profile_image_embedding"] = embedding
+    await db.attendees.update_one({"id": attendee_id, "event_id": event_id}, {"$set": update})
+    face_matcher.event_id = None
+    attendee = await db.attendees.find_one({"id": attendee_id, "event_id": event_id})
+    return {"attendee": serializers.attendee(attendee), "profile_pic_url": image_url, "source": source or "linkedin_profile_page", "has_embedding": embedding is not None}
 
 
 @router.delete("/events/{event_id}/attendees/{attendee_id}")

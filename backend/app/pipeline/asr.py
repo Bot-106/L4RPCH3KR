@@ -6,6 +6,9 @@ from app.pipeline.fixtures import LARP_TEXT, TRUTHFUL_TEXT
 
 log = logging.getLogger(__name__)
 
+_fixture_counter = 0
+_FIXTURE_CYCLE = [TRUTHFUL_TEXT, LARP_TEXT]
+
 
 def transcribe_fixture_frame(frame_index: int, audio: bytes) -> str:
     """Deterministic ASR stand-in until faster-whisper is wired to real WAV/audio frames."""
@@ -37,6 +40,11 @@ def whisper_model():
 
 def transcribe_pcm_frame(audio: bytes, sample_rate: int = 16000) -> str:
     """Transcribe raw mono PCM s16le audio sent by the Pi or browser capture client."""
+    global _fixture_counter
+    if settings.fixture_mode:
+        text = _FIXTURE_CYCLE[_fixture_counter % len(_FIXTURE_CYCLE)]
+        _fixture_counter += 1
+        return text
     if not audio:
         return ""
     try:
