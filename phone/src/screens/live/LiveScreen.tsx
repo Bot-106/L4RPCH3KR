@@ -54,6 +54,9 @@ export function LiveScreen() {
     const offPartner = wsClient.on('partner_identified', (data) => {
       setPartner(data.attendee);
     });
+    const offSubject = wsClient.on('subject_identified', (data) => {
+      if (data.attendee) setPartner(data.attendee);
+    });
 
     const offFlag = wsClient.on('flag_raised', async (data) => {
       pushFlag(data.flag, data.claim, data.utterance);
@@ -70,6 +73,7 @@ export function LiveScreen() {
       offReconnecting();
       offStatus();
       offPartner();
+      offSubject();
       offFlag();
       offScore();
       wsClient.disconnect();
@@ -77,6 +81,13 @@ export function LiveScreen() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jwt, user?.id]);
+
+  // Subscribe to session whenever one is active (set by ScanQrScreen after pairing)
+  useEffect(() => {
+    if (session?.id && wsClient.isConnected) {
+      wsClient.subscribeSession(session.id);
+    }
+  }, [session?.id, wsStatus]);
 
   const handleDismissFlag = useCallback(
     (flagId: string) => dismissFlag(flagId),

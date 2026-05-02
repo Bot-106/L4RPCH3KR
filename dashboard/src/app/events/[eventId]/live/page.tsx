@@ -6,26 +6,7 @@ import { api, apiWsUrl, Attendee, Claim, Event, Flag, getToken, Utterance, WsEnv
 type CaptureStatus = "idle" | "requesting_media" | "ready" | "connecting" | "live" | "stopped" | "error";
 
 type BrowserAudioWindow = Window & typeof globalThis & { webkitAudioContext?: typeof AudioContext };
-type SttStatus = "unknown" | "available" | "listening" | "unsupported" | "error" | "stopped";
-type SpeechRecognitionResultLike = { isFinal: boolean; 0: { transcript: string; confidence: number } };
-type SpeechRecognitionEventLike = { resultIndex: number; results: ArrayLike<SpeechRecognitionResultLike> };
-type SpeechRecognitionErrorEventLike = { error?: string; message?: string };
-type SpeechRecognitionLike = {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  onstart: (() => void) | null;
-  onend: (() => void) | null;
-  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
-  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
-  start: () => void;
-  stop: () => void;
-};
-type SpeechRecognitionWindow = Window &
-  typeof globalThis & {
-    SpeechRecognition?: new () => SpeechRecognitionLike;
-    webkitSpeechRecognition?: new () => SpeechRecognitionLike;
-  };
+type SttStatus = "unknown" | "backend" | "stopped";
 type SubjectIdentity = {
   attendee_id: string | null;
   attendee?: Attendee | null;
@@ -61,6 +42,17 @@ function scoreVerdict(score: number | null) {
   return "Probably not larping";
 }
 
+function larpPercent(score: number | null) {
+  return Math.round(Math.min(1, Math.max(0, score ?? 0)) * 100);
+}
+
+function larpAssessment(score: number | null, flags: Flag[]) {
+  if (flags.length === 0) return "No larp detected yet";
+  if ((score ?? 0) >= 0.66) return "Likely larping";
+  if ((score ?? 0) >= 0.33) return "Suspicious claim detected";
+  return "Low-confidence larp signal";
+}
+
 export default function LaptopLivePage({ params }: { params: Promise<{ eventId: string }> }) {
   const { eventId } = use(params);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -71,8 +63,6 @@ export default function LaptopLivePage({ params }: { params: Promise<{ eventId: 
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioProcessorRef = useRef<ScriptProcessorNode | null>(null);
   const audioSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
-  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
-  const sttRestartRef = useRef(false);
   const heartbeatRef = useRef<number | null>(null);
   const snapshotRef = useRef<number | null>(null);
 
@@ -110,9 +100,6 @@ export default function LaptopLivePage({ params }: { params: Promise<{ eventId: 
     audioProcessorRef.current?.disconnect();
     audioSourceRef.current?.disconnect();
     audioContextRef.current?.close().catch(() => undefined);
-    sttRestartRef.current = false;
-    recognitionRef.current?.stop();
-    recognitionRef.current = null;
     audioProcessorRef.current = null;
     audioSourceRef.current = null;
     audioContextRef.current = null;
@@ -124,70 +111,7 @@ export default function LaptopLivePage({ params }: { params: Promise<{ eventId: 
     mediaRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
     setStatus(nextStatus);
-    setSttStatus((current) => (current === "unsupported" ? current : "stopped"));
-  }
-
-  function startBrowserSpeechRecognition(sid: string, stream: MediaStream) {
-    const Recognition = (window as SpeechRecognitionWindow).SpeechRecognition || (window as SpeechRecognitionWindow).webkitSpeechRecognition;
-    if (!Recognition) {
-      setSttStatus("unsupported");
-      return false;
-    }
-
-    const recognition = new Recognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = "en-US";
-    sttRestartRef.current = true;
-    recognitionRef.current = recognition;
-
-    recognition.onstart = () => setSttStatus("listening");
-    recognition.onerror = (event) => {
-      sttRestartRef.current = false;
-      setSttStatus("error");
-      setError(`Browser speech recognition failed${event.error ? `: ${event.error}` : ""}. Falling back to raw audio streaming if backend ASR is available.`);
-      if (!audioProcessorRef.current) {
-        startAudioStreaming(stream, sid);
-      }
-    };
-    recognition.onend = () => {
-      if (sttRestartRef.current) {
-        window.setTimeout(() => {
-          try {
-            recognition.start();
-          } catch {
-            setSttStatus("error");
-          }
-        }, 250);
-      } else {
-        setSttStatus("stopped");
-      }
-    };
-    recognition.onresult = (event) => {
-      let interim = "";
-      for (let index = event.resultIndex; index < event.results.length; index += 1) {
-        const result = event.results[index];
-        const text = result[0]?.transcript.trim();
-        if (!text) continue;
-        if (result.isFinal) {
-          setInterimTranscript("");
-          sendPiJson("browser_transcript", { session_id: sid, text, speaker_hint: "partner", source: "web_speech", confidence: result[0]?.confidence ?? null }, sid);
-        } else {
-          interim = `${interim} ${text}`.trim();
-        }
-      }
-      setInterimTranscript(interim);
-    };
-
-    try {
-      recognition.start();
-      setSttStatus("available");
-      return true;
-    } catch (err) {
-      setSttStatus("error");
-      setError(err instanceof Error ? err.message : "Browser speech recognition could not start.");
-      return false;
-    }
+    setSttStatus("stopped");
   }
 
   function startAudioStreaming(stream: MediaStream, sid: string) {
@@ -283,7 +207,10 @@ export default function LaptopLivePage({ params }: { params: Promise<{ eventId: 
         } else if (parsed.type === "claim_detected" && "claim" in parsed.data) {
           setClaims((rows) => [parsed.data.claim as Claim, ...rows].slice(0, 20));
         } else if (parsed.type === "flag_raised" && "flag" in parsed.data) {
-          setFlags((rows) => [parsed.data.flag as Flag, ...rows].slice(0, 20));
+          const flag = parsed.data.flag as Flag;
+          setFlags((rows) => [flag, ...rows].slice(0, 20));
+          const delta = typeof flag.score_delta === "number" ? flag.score_delta : typeof flag.larp_score_delta === "number" ? flag.larp_score_delta : 0;
+          if (delta) setScore((current) => Math.min(1, (current ?? 0) + delta));
         } else if (parsed.type === "score_update" && "score" in parsed.data) {
           setScore(Number(parsed.data.score));
           setScoreLabel(String(parsed.data.label));
@@ -298,12 +225,8 @@ export default function LaptopLivePage({ params }: { params: Promise<{ eventId: 
       piWs.onopen = () => {
         piWs.send(JSON.stringify(envelope("pi_hello", { device_id: "browser-laptop", firmware_version: "dashboard-browser", battery_pct: null }, sid)));
         piWs.send(JSON.stringify(envelope("session_start", { session_id: sid, source: "browser" }, sid)));
-        const browserSttStarted = startBrowserSpeechRecognition(sid, stream);
-        if (browserSttStarted) {
-          sendPiJson("audio_meta", { session_id: sid, speaker_hint: "partner", source: "web_speech", transcription: "browser" }, sid);
-        } else {
-          startAudioStreaming(stream, sid);
-        }
+        startAudioStreaming(stream, sid);
+        setSttStatus("backend");
         sendSnapshot(sid);
         heartbeatRef.current = window.setInterval(() => sendPiJson("heartbeat", { session_id: sid, battery_pct: null, cpu_temp_c: null, buffer_seconds: 0, source: "browser" }, sid), 10000);
         snapshotRef.current = window.setInterval(() => sendSnapshot(sid), 10000);
@@ -364,7 +287,12 @@ export default function LaptopLivePage({ params }: { params: Promise<{ eventId: 
             <div className="rounded-[2rem] border border-lime-300/40 bg-lime-300 p-6 text-stone-950">
               <p className="text-xs font-black uppercase tracking-[0.25em]">Verdict</p>
               <p className="mt-3 text-4xl font-black">{scoreVerdict(score)}</p>
-              <p className="mt-2 text-sm font-bold">Score {score == null ? "--" : score.toFixed(2)} · {scoreLabel}</p>
+              <div className="mt-4 rounded-2xl bg-stone-950 p-4 text-white">
+                <p className="text-xs font-black uppercase tracking-[0.25em] text-lime-200">Larp probability</p>
+                <p className="mt-1 text-5xl font-black">{larpPercent(score)}%</p>
+                <p className="mt-1 text-sm font-bold text-lime-100">{larpAssessment(score, flags)}</p>
+              </div>
+              <p className="mt-2 text-sm font-bold">Score {score == null ? "--" : score.toFixed(2)} · {scoreLabel} · {flags.length} flags</p>
             </div>
             <div className="rounded-[2rem] border border-stone-700 bg-stone-900 p-6">
               <p className="text-xs font-black uppercase tracking-[0.25em] text-stone-400">Capture</p>
@@ -400,11 +328,11 @@ export default function LaptopLivePage({ params }: { params: Promise<{ eventId: 
               ) : null}
               {utterances.map((utterance) => (
                 <article key={utterance.id} className="rounded-2xl bg-stone-800 p-4">
-                  <p className="text-xs font-black uppercase tracking-widest text-orange-300">{utterance.speaker} · {(utterance.speaker_confidence * 100).toFixed(0)}%</p>
+                  <p className="text-xs font-black uppercase tracking-widest text-orange-300">speaker: {utterance.speaker}</p>
                   <p className="mt-2 text-sm text-stone-100">{utterance.text || utterance.transcript}</p>
                 </article>
               ))}
-              {!utterances.length && !interimTranscript ? <p className="rounded-2xl bg-stone-800 p-4 text-sm text-stone-400">Start capture and talk. Chrome/Edge will use browser speech-to-text; unsupported browsers fall back to backend audio transcription.</p> : null}
+              {!utterances.length && !interimTranscript ? <p className="rounded-2xl bg-stone-800 p-4 text-sm text-stone-400">Start capture and talk. Audio is streamed to backend ASR for transcription.</p> : null}
             </div>
           </div>
 

@@ -1,9 +1,11 @@
 import React, { useState, useCallback } from 'react';
-import { View, StyleSheet, Alert } from 'react-native';
+import { View, StyleSheet, Alert, TextInput } from 'react-native';
 
 import { Screen, Button, ThemedText } from '@/components';
 import { useTheme } from '@/theme/ThemeProvider';
-import { consumePairingToken } from '@/services/api';
+import { consumePairingToken, getSession } from '@/services/api';
+import { wsClient } from '@/services/ws';
+import { useSessionStore } from '@/stores/session';
 
 // react-native-vision-camera is installed but requires native build to function.
 // The scan path is available when the camera permission is granted.
@@ -13,6 +15,7 @@ type State = 'idle' | 'scanning' | 'processing' | 'success' | 'error';
 
 export function ScanQrScreen() {
   const { colors, spacing, radius } = useTheme();
+  const { setSession } = useSessionStore();
 
   const [state, setState] = useState<State>('idle');
   const [manualToken, setManualToken] = useState('');
@@ -22,7 +25,10 @@ export function ScanQrScreen() {
       if (!token.trim()) return;
       setState('processing');
       try {
-        await consumePairingToken(token.trim());
+        const { session_id } = await consumePairingToken(token.trim());
+        const { session } = await getSession(session_id);
+        setSession(session);
+        wsClient.subscribeSession(session_id);
         setState('success');
       } catch (e: unknown) {
         setState('error');
@@ -32,7 +38,7 @@ export function ScanQrScreen() {
         );
       }
     },
-    [],
+    [setSession],
   );
 
   return (
@@ -93,7 +99,7 @@ export function ScanQrScreen() {
           <ThemedText size="sm" variant="secondary">
             Or enter the token manually:
           </ThemedText>
-          <View
+          <TextInput
             style={[
               styles.inputRow,
               {
@@ -101,24 +107,20 @@ export function ScanQrScreen() {
                 borderColor: colors.border.default,
                 borderRadius: radius.md,
                 padding: spacing[3],
+                color: colors.text.primary,
+                fontFamily: 'Courier',
+                fontSize: 13,
+                borderWidth: 1,
               },
             ]}
-          >
-            <ThemedText
-              style={{
-                flex: 1,
-                color: manualToken ? colors.text.primary : colors.text.muted,
-                fontFamily: 'Courier',
-              }}
-              size="sm"
-              onPress={() => {
-                // Placeholder — in full impl we'd use a TextInput here
-              }}
-            >
-              {manualToken || 'Tap to enter token…'}
-            </ThemedText>
-          </View>
-          {/* Full TextInput would be used in real impl — simplified here */}
+            value={manualToken}
+            onChangeText={setManualToken}
+            placeholder="Paste token here"
+            placeholderTextColor={colors.text.muted}
+            autoCapitalize="none"
+            autoCorrect={false}
+            onSubmitEditing={() => handleToken(manualToken)}
+          />
           <Button
             label={state === 'processing' ? 'Connecting…' : 'Connect with token'}
             loading={state === 'processing'}

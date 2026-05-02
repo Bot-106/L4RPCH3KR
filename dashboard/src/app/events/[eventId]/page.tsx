@@ -13,9 +13,14 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
   const [error, setError] = useState<string | null>(null);
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [photoLoading, setPhotoLoading] = useState<string | null>(null);
   const exportHref = `${api.exportUrl(eventId)}?token=${encodeURIComponent(getToken())}`;
 
   const sorted = useMemo(() => [...attendees].sort((a, b) => String(a[sort] ?? "").localeCompare(String(b[sort] ?? ""))), [attendees, sort]);
+
+  function isHttpUrl(value: string | null | undefined) {
+    return typeof value === "string" && /^https?:\/\//.test(value) && !value.includes("<");
+  }
 
   async function load() {
     try {
@@ -88,6 +93,22 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
     }
   }
 
+  async function fetchPhoto(attendee: Attendee) {
+    try {
+      setError(null);
+      setPhotoLoading(attendee.id);
+      setStatus(`Fetching profile photo for ${attendee.full_name}...`);
+      const res = await api.fetchProfilePhoto(eventId, attendee.id);
+      setAttendees((rows) => rows.map((row) => (row.id === attendee.id ? res.attendee : row)));
+      setStatus(`Fetched ${attendee.full_name}'s LinkedIn profile photo.`);
+    } catch (err) {
+      setStatus("");
+      setError(err instanceof Error ? err.message : "Profile photo fetch failed");
+    } finally {
+      setPhotoLoading(null);
+    }
+  }
+
   useEffect(() => {
     if (!localStorage.getItem("larpchekr_jwt")) {
       window.location.href = "/sign-in";
@@ -145,27 +166,35 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
         </section>
 
         <section className="mt-6 overflow-hidden rounded-3xl border border-stone-300 bg-white">
-          <div className="grid grid-cols-[1.4fr_1fr_0.8fr_0.8fr_1fr_0.7fr] gap-3 border-b border-stone-200 bg-stone-950 px-4 py-3 text-sm font-bold text-white">
+          <div className="grid grid-cols-[1.4fr_0.8fr_0.6fr_0.8fr_1fr_1fr_0.7fr] gap-3 border-b border-stone-200 bg-stone-950 px-4 py-3 text-sm font-bold text-white">
             <button className="text-left" onClick={() => setSort("full_name")}>Name</button>
             <span>Score</span>
             <span>Flags</span>
             <span>GitHub</span>
+            <span>LinkedIn</span>
             <span>Status</span>
             <span />
           </div>
           {sorted.map((attendee) => (
-            <div key={attendee.id} className="grid grid-cols-[1.4fr_1fr_0.8fr_0.8fr_1fr_0.7fr] gap-3 border-b border-stone-200 px-4 py-3 text-sm">
+            <div key={attendee.id} className="grid grid-cols-[1.4fr_0.8fr_0.6fr_0.8fr_1fr_1fr_0.7fr] gap-3 border-b border-stone-200 px-4 py-3 text-sm">
               <div className="flex items-center gap-3">
                 {attendee.profile_pic_url || attendee.photo_url ? (
-                  <img className="h-10 w-10 rounded-full border border-stone-200 object-cover" src={attendee.profile_pic_url ?? attendee.photo_url ?? ""} alt={`${attendee.full_name} profile`} />
+                  <button className="relative h-10 w-10 shrink-0 rounded-full border border-stone-200" title="Fetch/update profile photo" onClick={() => void fetchPhoto(attendee)} disabled={photoLoading === attendee.id}>
+                    <img className="h-full w-full rounded-full object-cover" src={attendee.profile_pic_url ?? attendee.photo_url ?? ""} alt={`${attendee.full_name} profile`} />
+                    {photoLoading === attendee.id ? <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 text-[10px] font-black text-white">...</span> : null}
+                  </button>
                 ) : (
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-stone-200 text-xs font-black text-stone-600">?</div>
+                  <button className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-stone-200 text-xs font-black text-stone-600" title="Fetch profile photo" onClick={() => void fetchPhoto(attendee)} disabled={photoLoading === attendee.id}>{photoLoading === attendee.id ? "..." : "?"}</button>
                 )}
                 <input className="min-w-0 flex-1 rounded-lg border border-stone-200 px-2 py-1" defaultValue={attendee.full_name} onBlur={(e) => void update(attendee, "full_name", e.target.value)} />
               </div>
               <span className="rounded-lg bg-stone-100 px-2 py-1 font-bold">{attendee.larp_score == null ? "unavailable" : attendee.larp_score.toFixed(2)}</span>
               <span className="px-2 py-1">-</span>
               <input className="rounded-lg border border-stone-200 px-2 py-1" defaultValue={attendee.github_login ?? ""} onBlur={(e) => void update(attendee, "github_login", e.target.value)} />
+              <div className="flex min-w-0 gap-2">
+                <input className="min-w-0 flex-1 rounded-lg border border-stone-200 px-2 py-1" defaultValue={attendee.linkedin_url ?? ""} placeholder="LinkedIn URL or img snippet" onBlur={(e) => e.target.value !== (attendee.linkedin_url ?? "") ? void update(attendee, "linkedin_url", e.target.value) : undefined} />
+                {isHttpUrl(attendee.linkedin_url) ? <a className="rounded-lg bg-blue-50 px-2 py-1 font-bold text-blue-700 underline" href={attendee.linkedin_url ?? ""} target="_blank" rel="noreferrer">Open</a> : null}
+              </div>
               <span className="rounded-lg bg-emerald-50 px-2 py-1 font-bold text-emerald-800">{attendee.processing_status ?? "ready"}</span>
               <button className="rounded-lg bg-red-50 px-3 py-1 font-bold text-red-700" onClick={() => void remove(attendee)}>Delete</button>
             </div>

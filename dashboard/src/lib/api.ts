@@ -83,6 +83,7 @@ export type Flag = {
   claim_id?: string;
   subject_id?: string;
   severity: "low" | "medium" | "high" | string;
+  score_delta?: number;
   larp_score_delta?: number;
   claim_text?: string;
   verified_text?: string;
@@ -174,6 +175,7 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data)
     }),
+  fetchProfilePhoto: (eventId: string, attendeeId: string) => request<{ attendee: Attendee; profile_pic_url: string; source: string; has_embedding: boolean }>(`/events/${eventId}/attendees/${attendeeId}/profile-photo`, { method: "POST" }),
   deleteAttendee: (eventId: string, attendeeId: string) => request<{ attendee: Attendee }>(`/events/${eventId}/attendees/${attendeeId}`, { method: "DELETE" }),
   exportUrl: (eventId: string) => `${API_BASE}/events/${eventId}/export`
 };

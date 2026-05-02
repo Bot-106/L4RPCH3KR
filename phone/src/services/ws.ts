@@ -18,6 +18,7 @@ import type {
 export interface PhoneWsEvents {
   session_status: SessionStatusData;
   partner_identified: PartnerIdentifiedData;
+  subject_identified: PartnerIdentifiedData;
   transcript_update: TranscriptUpdateData;
   claim_detected: ClaimDetectedData;
   flag_raised: FlagRaisedData;
