@@ -41,8 +41,8 @@ docker compose -f infra/docker-compose.dev.yml up -d mongo
 $mongoReady = $false
 for ($i = 0; $i -lt 10; $i++) {
     try {
-        $result = docker exec $(docker compose -f infra/docker-compose.dev.yml ps -q mongo) `
-            mongosh --quiet --eval "db.runCommand({ping:1})" 2>$null
+        $containerId = docker compose -f infra/docker-compose.dev.yml ps -q mongo 2>$null
+        $result = docker exec $containerId mongosh --quiet --eval "db.runCommand({ping:1})" 2>$null
         if ($result -match '"ok"') { $mongoReady = $true; break }
     } catch {}
     Start-Sleep -Seconds 1
@@ -69,10 +69,8 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $uvicornLog = "$REPO\backend\uvicorn.log"
-$uvicornProc = Start-Process -FilePath ".venv\Scripts\uvicorn.exe" `
-    -ArgumentList "app.main:app", "--host", "0.0.0.0", "--port", "8000" `
-    -RedirectStandardOutput $uvicornLog `
-    -RedirectStandardError $uvicornLog `
+$uvicornProc = Start-Process -FilePath "cmd.exe" `
+    -ArgumentList "/c", ".venv\Scripts\uvicorn.exe app.main:app --host 0.0.0.0 --port 8000 >> `"$uvicornLog`" 2>&1" `
     -WorkingDirectory "$REPO\backend" `
     -PassThru -WindowStyle Hidden
 Log "FastAPI pid=$($uvicornProc.Id) — waiting for :8000..."
@@ -108,10 +106,8 @@ if (-not $NoDashboard) {
     }
 
     $dashLog = "$REPO\dashboard\next.log"
-    $dashProc = Start-Process -FilePath "npm.cmd" `
-        -ArgumentList "run", "dev", "--", "--port", "3001" `
-        -RedirectStandardOutput $dashLog `
-        -RedirectStandardError $dashLog `
+    $dashProc = Start-Process -FilePath "cmd.exe" `
+        -ArgumentList "/c", "npm.cmd run dev -- --port 3001 >> `"$dashLog`" 2>&1" `
         -WorkingDirectory "$REPO\dashboard" `
         -PassThru -WindowStyle Hidden
     Log "dashboard pid=$($dashProc.Id) — log: dashboard\next.log"
