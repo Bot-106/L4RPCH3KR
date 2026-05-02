@@ -178,8 +178,20 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
   }, [eventId]);
 
   return (
-    <main className="min-h-screen bg-[#f6f2e8] p-8 text-stone-950">
-      <div className="mx-auto max-w-7xl">
+    <main className="arcade-page">
+      <header className="arcade-masthead">
+        <div>
+          <div className="arcade-wordmark">LarpChecker</div>
+          <p className="mt-2 text-xs text-stone-400">ORGANIZER DASHBOARD · LIVE CREDENTIAL CHECK</p>
+        </div>
+        <nav className="flex flex-wrap gap-3 text-[10px]">
+          <a className="px-3 py-2" href="/events">EVENTS</a>
+          <a className="px-3 py-2" href={`/events/${eventId}/live`}>LIVE</a>
+          <a className="px-3 py-2" href={exportHref}>EXPORT</a>
+        </nav>
+      </header>
+      <div className="pixel-strip" />
+      <div className="mx-auto max-w-7xl p-8">
         <div className="flex items-end justify-between gap-4">
           <div>
             <a className="text-sm font-bold text-orange-700" href="/events">Back to events</a>

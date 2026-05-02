@@ -1,19 +1,165 @@
+@import url("https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
   color-scheme: light;
-  background: #f6f2e8;
-  color: #191713;
+  background: #ededed;
+  color: #000;
+  --arcade-paper: #fff;
+  --arcade-ink: #000;
+  --arcade-gray-100: #f6f6f6;
+  --arcade-gray-200: #ededed;
+  --arcade-gray-300: #e6e6e6;
+  --arcade-gray-400: #b9b9b9;
+  --arcade-gray-500: #9a9a9a;
+  --arcade-gray-600: #747474;
+  --score-0: #4ade80;
+  --score-25: #a3e635;
+  --score-50: #facc15;
+  --score-75: #fb923c;
+  --score-100: #ef4444;
 }
 
 body {
   margin: 0;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Press Start 2P", "VT323", ui-monospace, monospace;
+  image-rendering: pixelated;
 }
 
 button,
 input {
   font: inherit;
 }
+
+.arcade-page {
+  min-height: 100vh;
+  background: var(--arcade-gray-200);
+  color: var(--arcade-ink);
+  font-family: "Press Start 2P", "VT323", ui-monospace, monospace;
+}
+
+.arcade-page * {
+  border-radius: 0 !important;
+}
+
+.arcade-page h1,
+.arcade-page h2,
+.arcade-page h3,
+.arcade-page button,
+.arcade-page label,
+.arcade-page a,
+.arcade-page input,
+.arcade-page span {
+  letter-spacing: 0;
+}
+
+.arcade-page p,
+.arcade-page input,
+.arcade-page textarea,
+.arcade-page li,
+.arcade-page small {
+  font-family: "JetBrains Mono", "Space Mono", ui-monospace, monospace;
+}
+
+.arcade-page input,
+.arcade-page textarea {
+  background: #fff !important;
+  border: 2px solid #000 !important;
+  color: #000 !important;
+  box-shadow: 4px 4px 0 #b9b9b9;
+  outline: none;
+}
+
+.arcade-page input:focus,
+.arcade-page textarea:focus {
+  box-shadow: 4px 4px 0 #000;
+}
+
+.arcade-page button,
+.arcade-page .arcade-btn,
+.arcade-page a[href]:not(.plain-link) {
+  background: #000 !important;
+  border: 2px solid #000 !important;
+  color: #fff !important;
+  box-shadow: 5px 5px 0 #9a9a9a;
+  text-decoration: none !important;
+  transition: transform 120ms cubic-bezier(0.2, 0, 0, 1), box-shadow 120ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.arcade-page button:hover,
+.arcade-page .arcade-btn:hover,
+.arcade-page a[href]:not(.plain-link):hover {
+  transform: translate(2px, 2px);
+  box-shadow: 3px 3px 0 #9a9a9a;
+}
+
+.arcade-page button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.arcade-page section,
+.arcade-page form,
+.arcade-panel {
+  background: #fff !important;
+  border: 2px solid #000 !important;
+  box-shadow: none !important;
+}
+
+.arcade-page table,
+.arcade-page [class*="grid-cols-"] {
+  border-color: #000 !important;
+}
+
+.arcade-page .bg-stone-950,
+.arcade-page .bg-black {
+  background: #000 !important;
+}
+
+.arcade-page .text-stone-600,
+.arcade-page .text-stone-500,
+.arcade-page .text-stone-400 {
+  color: #747474 !important;
+}
+
+.arcade-masthead {
+  background: #000;
+  color: #fff;
+  min-height: 104px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 24px 32px;
+}
+
+.arcade-wordmark {
+  font-family: "VT323", "Press Start 2P", monospace;
+  font-size: clamp(42px, 8vw, 64px);
+  line-height: 0.9;
+}
+
+.arcade-mark {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  grid-template-columns: repeat(8, 6px);
+  grid-template-rows: repeat(8, 6px);
+  flex: 0 0 auto;
+}
+
+.arcade-mark i { display: block; background: #000; }
+.arcade-mark i.w { background: #fff; }
+.arcade-mark i.g { background: #9a9a9a; }
+
+.pixel-strip {
+  height: 16px;
+  background: repeating-linear-gradient(to right, #000 0 16px, #fff 16px 32px, #9a9a9a 32px 48px, #000 48px 64px);
+}
+
+.score-text-low { color: var(--score-0) !important; }
+.score-text-mid { color: var(--score-50) !important; }
+.score-text-high { color: var(--score-100) !important; }

@@ -47,13 +47,34 @@ export default function EventsPage() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-[#f6f2e8] p-10 text-stone-950">
-      <div className="mx-auto max-w-5xl">
-        <h1 className="text-5xl font-black tracking-tight">Events</h1>
-        <p className="mt-2 text-stone-600">Pick an event, import attendees, and export the enriched CSV.</p>
-        <form onSubmit={create} className="mt-8 flex gap-3 rounded-3xl border border-stone-300 bg-white p-4">
+    <main className="arcade-page">
+      <header className="arcade-masthead">
+        <div className="flex items-center gap-5">
+          <div className="arcade-mark" aria-hidden="true">
+            <i /><i /><i className="w" /><i className="w" /><i className="w" /><i className="w" /><i /><i />
+            <i /><i className="w" /><i className="g" /><i className="g" /><i className="g" /><i className="g" /><i className="w" /><i />
+            <i className="w" /><i className="g" /><i className="g" /><i className="w" /><i className="w" /><i className="g" /><i className="g" /><i className="w" />
+            <i className="w" /><i className="g" /><i className="w" /><i className="g" /><i className="g" /><i className="g" /><i className="g" /><i className="w" />
+            <i className="w" /><i className="g" /><i className="g" /><i className="g" /><i className="g" /><i className="g" /><i className="g" /><i className="w" />
+            <i className="w" /><i className="g" /><i className="g" /><i className="g" /><i className="g" /><i className="g" /><i className="g" /><i className="w" />
+            <i /><i className="w" /><i className="g" /><i className="g" /><i className="g" /><i className="g" /><i className="w" /><i />
+            <i /><i /><i className="w" /><i className="w" /><i className="w" /><i className="w" /><i /><i />
+          </div>
+          <div className="arcade-wordmark">LarpChecker</div>
+        </div>
+        <nav className="flex flex-wrap gap-3 text-[10px]">
+          <span className="bg-white px-3 py-2 text-black">EVENTS</span>
+          <span className="px-3 py-2 text-white">LEADERBOARD</span>
+          <span className="px-3 py-2 text-white">FLAGS</span>
+        </nav>
+      </header>
+      <div className="pixel-strip" />
+      <div className="mx-auto max-w-5xl p-10">
+        <h1 className="text-4xl font-black tracking-tight">EVENTS</h1>
+        <p className="mt-3 text-stone-600">Pick an event, import attendees, and export the enriched CSV.</p>
+        <form onSubmit={create} className="mt-8 flex gap-3 border border-stone-300 bg-white p-4">
           <input className="flex-1 rounded-xl border border-stone-300 px-4 py-3" value={name} onChange={(e) => setName(e.target.value)} aria-label="Event name" />
-          <button className="rounded-xl bg-orange-700 px-5 py-3 font-bold text-white">Create event</button>
+          <button className="px-5 py-3 font-bold">Create event</button>
         </form>
         {loading ? <p className="mt-8">Loading events...</p> : null}
         {error ? <p className="mt-8 rounded-xl bg-red-100 p-4 text-red-800">{error}</p> : null}
@@ -65,7 +86,7 @@ export default function EventsPage() {
         ) : null}
         <div className="mt-8 grid gap-4">
           {events.map((event) => (
-            <Link key={event.id} href={`/events/${event.id}`} className="rounded-3xl border border-stone-300 bg-white p-6 transition hover:-translate-y-0.5 hover:shadow-md">
+            <Link key={event.id} href={`/events/${event.id}`} className="border-2 border-black bg-white p-6 transition">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-2xl font-black">{event.name}</h2>
