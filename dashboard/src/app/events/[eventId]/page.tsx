@@ -1,7 +1,7 @@
 "use client";
 
-import { use, useEffect, useMemo, useState } from "react";
-import { api, Attendee, AttendeeSummary, Event, EventStats, getToken } from "@/lib/api";
+import { use, useEffect, useMemo, useRef, useState } from "react";
+import { api, apiWsUrl, Attendee, AttendeeSummary, Event, EventStats, Flag, getToken, WsEnvelope } from "@/lib/api";
 
 export default function EventPage({ params }: { params: Promise<{ eventId: string }> }) {
   const { eventId } = use(params);
@@ -176,6 +176,9 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
     }
   }
 
+  const selectedAttendeeRef = useRef<Attendee | null>(null);
+  useEffect(() => { selectedAttendeeRef.current = selectedAttendee; }, [selectedAttendee]);
+
   useEffect(() => {
     const token = getToken();
     setExportHref(`${api.exportUrl(eventId)}?token=${encodeURIComponent(token)}`);
@@ -184,6 +187,34 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
       return;
     }
     void load();
+
+    // Real-time phone WS: auto-update attendee larp scores and refresh
+    // the open side-panel when a flag or score_update arrives for that attendee.
+    const ws = new WebSocket(apiWsUrl("/ws/phone"));
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ id: crypto.randomUUID(), type: "subscribe_global", ts: new Date().toISOString(), session_id: null, data: {} }));
+    };
+    ws.onmessage = (msg) => {
+      const env = JSON.parse(msg.data as string) as WsEnvelope<Record<string, unknown>>;
+      if (env.type === "session_available" && env.data.session_id) {
+        const sid = String(env.data.session_id);
+        ws.send(JSON.stringify({ id: crypto.randomUUID(), type: "subscribe_session", ts: new Date().toISOString(), session_id: sid, data: { session_id: sid } }));
+      } else if (env.type === "score_update" && typeof env.data.score === "number" && env.data.subject_id) {
+        const subjectId = String(env.data.subject_id);
+        const newScore = Number(env.data.score);
+        setAttendees((rows) => rows.map((a) => a.id === subjectId ? { ...a, larp_score: newScore } : a));
+        if (selectedAttendeeRef.current?.id === subjectId) {
+          setSummary((s) => s ? { ...s, larp_score: newScore, attendee: { ...s.attendee, larp_score: newScore } } : s);
+        }
+      } else if (env.type === "flag_raised" && env.data.flag) {
+        const flag = env.data.flag as Flag;
+        const subjectId = flag.subject_id;
+        if (subjectId && selectedAttendeeRef.current?.id === subjectId) {
+          setSummary((s) => s ? { ...s, flags: [flag, ...(s.flags ?? [])].slice(0, 50) } : s);
+        }
+      }
+    };
+    return () => ws.close();
   }, [eventId]);
 
   return (

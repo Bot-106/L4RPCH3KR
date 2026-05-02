@@ -2,7 +2,7 @@ import json
 import logging
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -118,7 +118,18 @@ async def handle_phone_ws(ws: WebSocket, token: str | None = None) -> None:
             )
             if event_type == "subscribe_global":
                 await manager.subscribe_global(ws)
-                await ws.send_json(envelope("global_subscribed", {}, None))
+                # Immediately replay any currently active Pi sessions so
+                # late-connecting dashboards (or React strict-mode remounts)
+                # don't miss the session_available broadcast.
+                cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=4)
+                active = await database().sessions.find(
+                    {"ended_at": None, "started_at": {"$gte": cutoff}}
+                ).to_list(None)
+                for s in active:
+                    sid = s.get("id")
+                    if sid:
+                        await ws.send_json(envelope("session_available", {"session_id": sid, "event_id": s.get("event_id")}))
+                await ws.send_json(envelope("global_subscribed", {"replayed": len(active)}, None))
             elif event_type == "subscribe_session" and session_id:
                 await manager.subscribe_phone(session_id, ws)
                 await ws.send_json(envelope("session_status", {"session_id": session_id, "status": "active", "partner": None}, session_id))

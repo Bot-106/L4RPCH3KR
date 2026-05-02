@@ -105,7 +105,7 @@ async def process_simulated_utterance(db: AsyncIOMotorDatabase, session_id: str,
                 )
                 await manager.send_pi_haptic(eval_flag["severity"])
                 print(f"[EVAL] flag raised subject_id={subject_id} severity={eval_flag['severity']} score={new_score:.3f}", flush=True)
-            await manager.send_phone(session_id, "score_update", {"session_id": session_id, "score": new_score, "label": score_label(new_score)})
+            await manager.send_phone(session_id, "score_update", {"session_id": session_id, "score": new_score, "label": score_label(new_score), "subject_id": subject_id})
             print(f"[EVAL] score_update sent session_id={session_id} score={new_score:.3f}", flush=True)
 
     claims = await extract_claims(text, utterance["id"]) if speaker in {"partner", "subject"} else []
