@@ -1,0 +1,657 @@
+11:44:53 INFO     __main__ L4RPCH3KR Pi starting (device_id=rpi-001, fake_hardware=False)
+11:44:53 INFO     larpchekr.preview_server preview: phase → pairing  show QR code to camera
+11:44:53 INFO     larpchekr.preview_server preview: serving on http://0.0.0.0:8080
+11:44:54 INFO     __main__ pairing: camera ready
+11:44:54 INFO     larpchekr.preview_server preview: phase → scanning  120s remaining
+11:44:54 INFO     larpchekr.preview_server preview: phase → scanning  120s remaining
+11:44:54 INFO     larpchekr.preview_server preview: phase → scanning  120s remaining
+11:44:54 INFO     larpchekr.preview_server preview: phase → scanning  120s remaining
+11:44:54 INFO     larpchekr.preview_server preview: phase → scanning  119s remaining
+11:44:54 INFO     larpchekr.preview_server preview: phase → scanning  119s remaining
+11:44:54 INFO     larpchekr.preview_server preview: phase → scanning  119s remaining
+11:44:55 INFO     larpchekr.preview_server preview: phase → scanning  119s remaining
+11:44:55 INFO     larpchekr.preview_server preview: phase → scanning  119s remaining
+11:44:55 INFO     larpchekr.preview_server preview: phase → scanning  119s remaining
+11:44:55 INFO     larpchekr.preview_server preview: phase → scanning  119s remaining
+11:44:55 INFO     larpchekr.preview_server preview: phase → scanning  119s remaining
+11:44:55 INFO     larpchekr.preview_server preview: phase → scanning  118s remaining
+11:44:55 INFO     larpchekr.preview_server preview: phase → scanning  118s remaining
+11:44:55 INFO     larpchekr.preview_server preview: phase → scanning  118s remaining
+11:44:56 INFO     larpchekr.preview_server preview: phase → scanning  118s remaining
+11:44:56 INFO     larpchekr.preview_server preview: phase → scanning  118s remaining
+11:44:56 INFO     larpchekr.preview_server preview: phase → scanning  118s remaining
+11:44:56 INFO     larpchekr.preview_server preview: phase → scanning  118s remaining
+11:44:56 INFO     larpchekr.preview_server preview: phase → scanning  118s remaining
+11:44:56 INFO     larpchekr.preview_server preview: phase → scanning  118s remaining
+11:44:56 INFO     larpchekr.preview_server preview: phase → scanning  117s remaining
+11:44:56 INFO     larpchekr.preview_server preview: phase → scanning  117s remaining
+11:44:57 INFO     larpchekr.preview_server preview: phase → scanning  117s remaining
+11:44:57 INFO     larpchekr.preview_server preview: phase → scanning  117s remaining
+11:44:57 INFO     larpchekr.preview_server preview: phase → scanning  117s remaining
+11:44:57 INFO     larpchekr.preview_server preview: phase → scanning  117s remaining
+11:44:57 INFO     larpchekr.preview_server preview: phase → scanning  117s remaining
+11:44:57 INFO     larpchekr.preview_server preview: phase → scanning  117s remaining
+11:44:57 INFO     larpchekr.preview_server preview: phase → scanning  116s remaining
+11:44:57 INFO     larpchekr.preview_server preview: phase → scanning  116s remaining
+11:44:58 INFO     larpchekr.preview_server preview: phase → scanning  116s remaining
+11:44:58 INFO     larpchekr.preview_server preview: phase → scanning  116s remaining
+11:44:58 INFO     larpchekr.preview_server preview: phase → scanning  116s remaining
+11:44:58 INFO     larpchekr.preview_server preview: phase → scanning  116s remaining
+11:44:58 INFO     larpchekr.preview_server preview: phase → scanning  116s remaining
+11:44:58 INFO     larpchekr.preview_server preview: phase → scanning  115s remaining
+11:44:58 INFO     larpchekr.preview_server preview: phase → scanning  115s remaining
+11:44:58 INFO     larpchekr.preview_server preview: phase → scanning  115s remaining
+11:44:59 INFO     larpchekr.preview_server preview: phase → scanning  115s remaining
+11:44:59 INFO     larpchekr.preview_server preview: phase → scanning  115s remaining
+11:44:59 INFO     larpchekr.preview_server preview: phase → scanning  115s remaining
+11:44:59 INFO     larpchekr.preview_server preview: phase → scanning  115s remaining
+11:44:59 INFO     larpchekr.preview_server preview: phase → scanning  115s remaining
+11:44:59 INFO     larpchekr.preview_server preview: phase → scanning  114s remaining
+11:44:59 INFO     larpchekr.preview_server preview: phase → scanning  114s remaining
+11:45:00 INFO     larpchekr.preview_server preview: phase → scanning  114s remaining
+11:45:00 INFO     larpchekr.preview_server preview: phase → scanning  114s remaining
+11:45:00 INFO     larpchekr.preview_server preview: phase → scanning  114s remaining
+11:45:00 INFO     larpchekr.preview_server preview: phase → scanning  114s remaining
+11:45:00 INFO     larpchekr.preview_server preview: phase → scanning  114s remaining
+11:45:00 INFO     larpchekr.preview_server preview: phase → scanning  114s remaining
+11:45:00 INFO     larpchekr.preview_server preview: phase → scanning  113s remaining
+11:45:00 INFO     larpchekr.preview_server preview: phase → scanning  113s remaining
+11:45:01 INFO     larpchekr.preview_server preview: phase → scanning  113s remaining
+11:45:01 INFO     larpchekr.preview_server preview: phase → scanning  113s remaining
+11:45:01 INFO     larpchekr.preview_server preview: phase → scanning  113s remaining
+11:45:01 INFO     larpchekr.preview_server preview: phase → scanning  113s remaining
+11:45:01 INFO     larpchekr.preview_server preview: phase → scanning  113s remaining
+11:45:01 INFO     larpchekr.preview_server preview: phase → scanning  113s remaining
+11:45:01 INFO     larpchekr.preview_server preview: phase → scanning  112s remaining
+11:45:01 INFO     larpchekr.preview_server preview: phase → scanning  112s remaining
+11:45:02 INFO     larpchekr.preview_server preview: phase → scanning  112s remaining
+11:45:02 INFO     larpchekr.preview_server preview: phase → scanning  112s remaining
+11:45:02 INFO     larpchekr.preview_server preview: phase → scanning  112s remaining
+11:45:02 INFO     larpchekr.preview_server preview: phase → scanning  112s remaining
+11:45:02 INFO     larpchekr.preview_server preview: phase → scanning  112s remaining
+11:45:02 INFO     larpchekr.preview_server preview: phase → scanning  111s remaining
+11:45:02 INFO     larpchekr.preview_server preview: phase → scanning  111s remaining
+11:45:02 INFO     larpchekr.preview_server preview: phase → scanning  111s remaining
+11:45:03 INFO     larpchekr.preview_server preview: phase → scanning  111s remaining
+11:45:03 INFO     larpchekr.preview_server preview: phase → scanning  111s remaining
+11:45:03 INFO     larpchekr.preview_server preview: phase → scanning  111s remaining
+11:45:03 INFO     larpchekr.preview_server preview: phase → scanning  111s remaining
+11:45:03 INFO     larpchekr.preview_server preview: phase → scanning  111s remaining
+11:45:03 INFO     larpchekr.preview_server preview: phase → scanning  110s remaining
+11:45:03 INFO     larpchekr.preview_server preview: phase → scanning  110s remaining
+11:45:03 INFO     larpchekr.preview_server preview: phase → scanning  110s remaining
+11:45:04 INFO     larpchekr.preview_server preview: phase → scanning  110s remaining
+11:45:04 INFO     larpchekr.preview_server preview: phase → scanning  110s remaining
+11:45:04 INFO     larpchekr.preview_server preview: phase → scanning  110s remaining
+11:45:04 INFO     larpchekr.preview_server preview: phase → scanning  110s remaining
+11:45:04 INFO     larpchekr.preview_server preview: phase → scanning  110s remaining
+11:45:04 INFO     larpchekr.preview_server preview: phase → scanning  109s remaining
+11:45:04 INFO     larpchekr.preview_server preview: phase → scanning  109s remaining
+11:45:04 INFO     larpchekr.preview_server preview: phase → scanning  109s remaining
+11:45:05 INFO     larpchekr.preview_server preview: phase → scanning  109s remaining
+11:45:05 INFO     larpchekr.preview_server preview: phase → scanning  109s remaining
+11:45:05 INFO     larpchekr.preview_server preview: phase → scanning  109s remaining
+11:45:05 INFO     larpchekr.preview_server preview: phase → scanning  109s remaining
+11:45:05 INFO     larpchekr.preview_server preview: phase → scanning  109s remaining
+11:45:05 INFO     larpchekr.preview_server preview: phase → scanning  108s remaining
+11:45:05 INFO     larpchekr.preview_server preview: phase → scanning  108s remaining
+11:45:05 INFO     larpchekr.preview_server preview: phase → scanning  108s remaining
+11:45:06 INFO     larpchekr.preview_server preview: phase → scanning  108s remaining
+11:45:06 INFO     larpchekr.preview_server preview: phase → scanning  108s remaining
+11:45:06 INFO     larpchekr.preview_server preview: phase → scanning  108s remaining
+11:45:06 INFO     larpchekr.preview_server preview: phase → scanning  108s remaining
+11:45:06 INFO     larpchekr.preview_server preview: phase → scanning  108s remaining
+11:45:06 INFO     larpchekr.preview_server preview: phase → scanning  107s remaining
+11:45:06 INFO     larpchekr.preview_server preview: phase → scanning  107s remaining
+11:45:06 INFO     larpchekr.preview_server preview: phase → scanning  107s remaining
+11:45:07 INFO     __main__ pairing: QR scanned — claiming token
+11:45:07 INFO     larpchekr.preview_server preview: phase → claimed  QR detected — connecting to backend
+11:45:07 INFO     larpchekr.pairing pairing: claiming with backend http://100.76.124.67:8000
+11:45:07 INFO     httpx HTTP Request: POST http://100.76.124.67:8000/pi/claim "HTTP/1.1 201 Created"
+11:45:07 INFO     larpchekr.pairing pairing: claimed — user_id=01KQKEBJ3MQRXT7DDK929RTPHS
+11:45:07 INFO     larpchekr.pairing pairing: token saved to /tmp/larpchekr/pi_token
+11:45:07 INFO     larpchekr.preview_server preview: phase → connecting  ws://100.76.124.67:8000/ws/pi
+/home/pi/L4RPCH3KR/pi/.venv/lib/python3.13/site-packages/gpiozero/devices.py:295: PinFactoryFallback: Falling back from lgpio: No module named 'lgpio'
+  warnings.warn(
+/home/pi/L4RPCH3KR/pi/.venv/lib/python3.13/site-packages/gpiozero/devices.py:295: PinFactoryFallback: Falling back from rpigpio: No module named 'RPi'
+  warnings.warn(
+/home/pi/L4RPCH3KR/pi/.venv/lib/python3.13/site-packages/gpiozero/devices.py:295: PinFactoryFallback: Falling back from pigpio: No module named 'pigpio'
+  warnings.warn(
+/home/pi/L4RPCH3KR/pi/.venv/lib/python3.13/site-packages/gpiozero/devices.py:295: PinFactoryFallback: Falling back from native: unable to open /dev/gpiomem or /dev/mem; upgrade your kernel or run as root
+  warnings.warn(
+11:45:07 WARNING  larpchekr.hardware.led LED: GPIO init failed (Unable to load any default pin factory!) — falling back to fake
+11:45:07 WARNING  larpchekr.hardware.haptic haptic: GPIO init failed (Unable to load any default pin factory!) — falling back to fake
+11:45:08 WARNING  larpchekr.hardware.button button: GPIO init failed (Unable to load any default pin factory!) — falling back to fake
+11:45:08 INFO     larpchekr.hardware.button button: FAKE mode — send SIGUSR1 (kill -USR1 12686) to simulate press
+11:45:08 INFO     larpchekr.ws_client ws: connecting to ws://100.76.124.67:8000/ws/pi?token=pi_rpi-001_ERdGJEZp7qcFfrVZ
+11:45:08 INFO     larpchekr.audio audio: sounddevice stream started
+11:45:08 INFO     larpchekr.camera camera: started (fake=False, interval=10s)
+11:45:08 INFO     larpchekr.camera camera: preview loop started (5 fps, fake=False)
+11:45:08 INFO     larpchekr.camera face: detector started (fake=False, start=3 end=15 frames)
+11:45:08 INFO     larpchekr.preview_server preview: phase → connecting  ws://100.76.124.67:8000/ws/pi
+11:45:09 INFO     larpchekr.ws_client ws: connected
+11:45:09 INFO     larpchekr.hardware.led LED → armed (0.0, 0.0, 1.0)
+11:45:09 INFO     larpchekr.preview_server preview: phase → armed  rpi-001
+11:45:10 INFO     larpchekr.preview_server preview: phase → armed  rpi-001
+11:45:11 INFO     larpchekr.preview_server preview: phase → armed  rpi-001
+11:45:12 INFO     larpchekr.preview_server preview: phase → armed  rpi-001
+11:45:13 INFO     larpchekr.preview_server preview: phase → armed  rpi-001
+11:45:14 INFO     larpchekr.preview_server preview: phase → armed  rpi-001
+11:45:15 INFO     larpchekr.preview_server preview: phase → armed  rpi-001
+11:45:16 INFO     larpchekr.preview_server preview: phase → armed  rpi-001
+11:45:17 INFO     larpchekr.preview_server preview: phase → armed  rpi-001
+11:45:17 INFO     larpchekr.camera face: present 3 frames — starting session
+11:45:17 INFO     __main__ face: session started id=6aed7ca0c22b4042a1e9efe133d6b38a
+11:45:17 INFO     larpchekr.ws_client ws: session_ack received for session_id=6aed7ca0c22b4042a1e9efe133d6b38a
+11:45:18 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:19 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:20 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:21 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:22 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:23 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:24 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:25 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:26 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:27 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:27 INFO     larpchekr.transcriber transcriber: loading tiny.en model (int8, cpu)…
+11:45:28 INFO     httpx HTTP Request: GET https://huggingface.co/api/models/Systran/faster-whisper-tiny.en/revision/main "HTTP/1.1 200 OK"
+11:45:28 INFO     larpchekr.transcriber transcriber: model ready
+11:45:28 INFO     faster_whisper Processing audio with duration 00:10.000
+11:45:28 INFO     faster_whisper VAD filter removed 00:00.000 of audio
+11:45:28 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:29 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:30 INFO     larpchekr.audio audio: transcript → detective face. So now we're detecting a face consistent sleep. So now we're  ge
+11:45:30 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:31 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:32 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:33 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:34 INFO     larpchekr.camera face: absent 15 frames — ending session
+11:45:34 INFO     __main__ face: session ended id=6aed7ca0c22b4042a1e9efe133d6b38a
+11:45:34 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:35 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:36 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:37 INFO     faster_whisper Processing audio with duration 00:10.000
+11:45:37 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:37 INFO     faster_whisper VAD filter removed 00:00.000 of audio
+11:45:38 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:39 INFO     larpchekr.audio audio: transcript → and a little bit hopefully you can see the transcript pop up because it's 15 sec
+11:45:39 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:40 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:41 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:42 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:43 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:44 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:45 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:46 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:47 INFO     faster_whisper Processing audio with duration 00:10.000
+11:45:47 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:47 INFO     faster_whisper VAD filter removed 00:00.000 of audio
+11:45:48 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:49 INFO     larpchekr.audio audio: transcript → Anything tells me if I receive it.  Oh, so then ask it to log it.  Yeah.  I just
+11:45:49 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:50 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:51 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:52 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:53 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:54 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:55 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:56 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:57 INFO     faster_whisper Processing audio with duration 00:10.000
+11:45:57 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:57 INFO     faster_whisper VAD filter removed 00:00.000 of audio
+11:45:58 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:45:59 INFO     larpchekr.audio audio: transcript → I just started the wild tradition.  And it's kind of a turtle.  Once it's too tr
+11:45:59 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:00 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:01 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:02 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:03 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:04 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:05 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:06 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:07 INFO     faster_whisper Processing audio with duration 00:10.000
+11:46:07 INFO     faster_whisper VAD filter removed 00:00.048 of audio
+11:46:07 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:08 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:09 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:09 INFO     larpchekr.audio audio: transcript → different kind of traffic.  So it's two different things.  Can you use two agent
+11:46:10 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:11 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:12 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:13 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:14 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:15 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:16 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:17 INFO     faster_whisper Processing audio with duration 00:10.000
+11:46:17 INFO     faster_whisper VAD filter removed 00:00.272 of audio
+11:46:17 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:19 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:19 INFO     larpchekr.audio audio: transcript → I don't want to do it.  What is what?  Oh, it did something to the S code.
+11:46:20 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:21 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:22 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:23 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:24 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:25 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:26 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:27 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:27 INFO     faster_whisper Processing audio with duration 00:10.000
+11:46:27 INFO     faster_whisper VAD filter removed 00:00.000 of audio
+11:46:28 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:29 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:29 INFO     larpchekr.audio audio: transcript → built an agent in it.  Yeah.  That's it.  I'm just like, I've never done anythin
+11:46:30 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:31 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:32 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:33 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:34 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:35 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:36 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:37 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:37 INFO     faster_whisper Processing audio with duration 00:10.000
+11:46:37 INFO     faster_whisper VAD filter removed 00:00.000 of audio
+11:46:38 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:39 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:39 INFO     larpchekr.audio audio: transcript → So things they're also like copies of the S-CoV-3.  That's great. We've got a lo
+11:46:40 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:41 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:42 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:43 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:44 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:45 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:46 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:47 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:47 INFO     faster_whisper Processing audio with duration 00:10.000
+11:46:47 INFO     faster_whisper VAD filter removed 00:00.000 of audio
+11:46:48 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:49 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:49 INFO     larpchekr.audio audio: transcript → I'll be gonna borrow your apple and shirt here.  And I watch the bat die.  See, 
+11:46:50 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:51 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:52 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:53 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:54 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:55 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:56 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:57 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:57 INFO     faster_whisper Processing audio with duration 00:10.000
+11:46:57 INFO     faster_whisper VAD filter removed 00:00.000 of audio
+11:46:58 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:46:59 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:47:00 INFO     larpchekr.audio audio: transcript → I'm gonna give him a little bit.  I have five percent.  I need my badge.  Where 
+11:47:00 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:47:01 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:47:02 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:47:03 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:47:04 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:47:05 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:47:06 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:47:07 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:47:07 WARNING  larpchekr.ws_client ws: disconnected (received 1012 (service restart); then sent 1012 (service restart)) — reconnecting in 1.0s
+11:47:07 INFO     larpchekr.hardware.led LED → degraded (1.0, 1.0, 0.0)
+11:47:07 INFO     faster_whisper Processing audio with duration 00:10.000
+11:47:07 INFO     faster_whisper VAD filter removed 00:00.000 of audio
+11:47:08 INFO     larpchekr.preview_server preview: phase → connecting  ws://100.76.124.67:8000/ws/pi
+11:47:08 INFO     larpchekr.ws_client ws: connecting to ws://100.76.124.67:8000/ws/pi?token=pi_rpi-001_ERdGJEZp7qcFfrVZ
+11:47:09 INFO     larpchekr.preview_server preview: phase → connecting  ws://100.76.124.67:8000/ws/pi
+11:47:10 INFO     larpchekr.audio audio: transcript → I could, I could ask you about it.  Here you go.  See you, hey, me bro.  I can h
+11:47:10 INFO     larpchekr.preview_server preview: phase → connecting  ws://100.76.124.67:8000/ws/pi
+11:47:11 INFO     larpchekr.preview_server preview: phase → connecting  ws://100.76.124.67:8000/ws/pi
+11:47:12 INFO     larpchekr.ws_client ws: connected
+11:47:12 INFO     larpchekr.ws_client ws: draining buffer (0.0s of audio)
+11:47:12 INFO     larpchekr.ws_client ws: buffer drain complete
+11:47:12 INFO     larpchekr.hardware.led LED → armed (0.0, 0.0, 1.0)
+11:47:12 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:47:13 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:47:14 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:47:15 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:47:16 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:47:17 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:47:17 INFO     faster_whisper Processing audio with duration 00:10.000
+11:47:17 INFO     faster_whisper VAD filter removed 00:00.000 of audio
+11:47:18 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:47:19 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:47:19 INFO     larpchekr.audio audio: transcript → Okay, okay, okay, okay.  Right now?  We're talking about the food already.  So i
+11:47:20 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:47:21 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:47:22 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:47:23 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:47:24 INFO     larpchekr.preview_server preview: phase → recording  6aed7ca0c22b
+11:47:24 INFO     larpchekr.camera face: present 3 frames — starting session
+11:47:24 INFO     __main__ face: session started id=1924623627fe4618992de1c1fe3ac8a5
+11:47:24 INFO     larpchekr.ws_client ws: session_ack received for session_id=1924623627fe4618992de1c1fe3ac8a5
+11:47:24 ERROR    larpchekr.ws_client ws: backend error code=unsupported_event_type message=unsupported event type session_start
+11:47:25 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:47:26 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:47:27 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:47:27 INFO     faster_whisper Processing audio with duration 00:10.000
+11:47:27 INFO     faster_whisper VAD filter removed 00:00.000 of audio
+11:47:28 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:47:29 INFO     larpchekr.audio audio: transcript → Hello, hello, my name is John Cena. Yeah, yeah.
+11:47:29 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:47:30 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:47:31 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:47:32 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:47:33 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:47:34 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:47:35 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:47:36 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:47:37 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:47:37 INFO     faster_whisper Processing audio with duration 00:10.000
+11:47:37 INFO     faster_whisper VAD filter removed 00:00.000 of audio
+11:47:38 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:47:39 INFO     larpchekr.audio audio: transcript → was good guys on today's episode we're gonna be reviewing  uh food
+11:47:39 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:47:40 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:47:41 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:47:42 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:47:43 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:47:44 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:47:45 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:47:46 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:47:47 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:47:47 INFO     faster_whisper Processing audio with duration 00:10.000
+11:47:47 INFO     faster_whisper VAD filter removed 00:00.000 of audio
+11:47:48 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:47:49 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:47:49 INFO     larpchekr.audio audio: transcript → I think because we're gonna be reviewing before like that means we got a harder 
+11:47:50 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:47:51 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:47:52 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:47:53 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:47:54 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:47:55 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:47:56 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:47:57 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:47:57 INFO     faster_whisper Processing audio with duration 00:10.000
+11:47:57 INFO     faster_whisper VAD filter removed 00:00.000 of audio
+11:47:58 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:47:59 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:47:59 INFO     larpchekr.camera face: absent 15 frames — ending session
+11:47:59 INFO     __main__ face: session ended id=1924623627fe4618992de1c1fe3ac8a5
+11:48:00 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:00 INFO     larpchekr.audio audio: transcript → you want to ask GPT-5 whether it's an issue with the code or the  Python or the 
+11:48:01 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:02 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:03 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:04 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:05 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:06 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:07 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:07 INFO     faster_whisper Processing audio with duration 00:10.000
+11:48:07 INFO     faster_whisper VAD filter removed 00:02.848 of audio
+11:48:08 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:09 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:09 INFO     larpchekr.audio audio: transcript → Also leave like maybe a .5.  Yeah.  Good. That's kids like a gurne mount.
+11:48:10 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:11 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:12 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:13 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:14 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:15 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:16 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:17 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:17 INFO     faster_whisper Processing audio with duration 00:10.000
+11:48:18 INFO     faster_whisper VAD filter removed 00:00.496 of audio
+11:48:18 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:18 INFO     larpchekr.audio audio: transcript → I think so.
+11:48:19 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:20 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:21 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:22 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:23 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:24 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:25 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:26 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:27 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:28 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:28 INFO     faster_whisper Processing audio with duration 00:10.500
+11:48:28 INFO     faster_whisper VAD filter removed 00:00.000 of audio
+11:48:29 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:29 INFO     larpchekr.audio audio: transcript → Okay Gemini I believe in you this Gemini 3.1 Pro wait look
+11:48:30 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:31 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:32 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:33 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:34 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:35 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:36 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:37 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:38 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:38 INFO     faster_whisper Processing audio with duration 00:10.000
+11:48:38 INFO     faster_whisper VAD filter removed 00:00.000 of audio
+11:48:39 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:39 INFO     larpchekr.audio audio: transcript → I have other means to an instructor.  Google AI student.  Sorry.
+11:48:40 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:41 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:42 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:43 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:44 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:45 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:46 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:47 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:48 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:48 INFO     faster_whisper Processing audio with duration 00:10.000
+11:48:48 INFO     faster_whisper VAD filter removed 00:00.000 of audio
+11:48:49 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:50 INFO     larpchekr.audio audio: transcript → I think it's a little bit of a fun thing.  I think it's a little bit of fun.  I 
+11:48:50 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:51 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:52 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:53 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:54 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:55 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:56 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:57 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:58 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:48:58 INFO     faster_whisper Processing audio with duration 00:10.000
+11:48:58 INFO     faster_whisper VAD filter removed 00:00.000 of audio
+11:48:59 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:00 INFO     larpchekr.audio audio: transcript → Oh, I think I'm like like a 0.1 million year old.  And I jokey.  Put some.
+11:49:00 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:01 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:02 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:03 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:04 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:05 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:06 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:07 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:08 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:08 INFO     faster_whisper Processing audio with duration 00:10.000
+11:49:08 INFO     faster_whisper VAD filter removed 00:00.000 of audio
+11:49:09 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:09 INFO     larpchekr.audio audio: transcript → I don't care what it is to sell it.  What are you able to figure out whether it 
+11:49:10 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:11 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:12 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:13 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:14 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:15 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:16 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:17 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:18 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:18 INFO     faster_whisper Processing audio with duration 00:10.000
+11:49:18 INFO     faster_whisper VAD filter removed 00:00.000 of audio
+11:49:19 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:20 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:21 INFO     larpchekr.audio audio: transcript → I'm sure what they are.  I just want to do that.  We are doing nothing to go and
+11:49:21 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:22 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:23 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:24 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:25 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:26 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:27 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:28 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:28 INFO     faster_whisper Processing audio with duration 00:10.000
+11:49:28 INFO     faster_whisper VAD filter removed 00:00.000 of audio
+11:49:29 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:29 INFO     larpchekr.audio audio: transcript → You are sure this is the easy
+11:49:30 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:31 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:32 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:33 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:34 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:35 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:36 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:37 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:38 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:38 INFO     faster_whisper Processing audio with duration 00:10.000
+11:49:38 INFO     faster_whisper VAD filter removed 00:00.000 of audio
+11:49:39 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:40 INFO     larpchekr.audio audio: transcript → Only a treat for such a spicy right?  I think it's a pressure for you guys.  Yea
+11:49:40 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:41 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:42 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:43 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:44 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:45 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:46 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:47 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:48 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:48 INFO     faster_whisper Processing audio with duration 00:10.000
+11:49:48 INFO     faster_whisper VAD filter removed 00:02.224 of audio
+11:49:49 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:49 INFO     larpchekr.audio audio: transcript → There will be any other things.
+11:49:50 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:51 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:52 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:53 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:54 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:55 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:56 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:57 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:58 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:58 INFO     faster_whisper Processing audio with duration 00:10.000
+11:49:58 INFO     faster_whisper VAD filter removed 00:00.000 of audio
+11:49:59 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:49:59 INFO     larpchekr.audio audio: transcript → I saw the other pies IP on the pies AD AD IP board 880
+11:50:00 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:01 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:02 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:03 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:04 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:05 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:06 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:07 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:08 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:08 INFO     faster_whisper Processing audio with duration 00:10.000
+11:50:08 INFO     faster_whisper VAD filter removed 00:00.000 of audio
+11:50:09 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:10 INFO     larpchekr.audio audio: transcript → on what's this call to get the Freakin service tail scale on tail scale.  Is thi
+11:50:10 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:11 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:12 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:13 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:14 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:15 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:16 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:17 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:18 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:18 INFO     faster_whisper Processing audio with duration 00:10.000
+11:50:18 INFO     faster_whisper VAD filter removed 00:05.312 of audio
+11:50:19 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:19 INFO     larpchekr.audio audio: transcript → over onto the web socket, into the back end.  Sure, can we like that?
+11:50:20 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:21 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:22 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:23 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:24 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:25 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:26 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:27 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:28 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:28 INFO     faster_whisper Processing audio with duration 00:10.000
+11:50:28 INFO     faster_whisper VAD filter removed 00:00.000 of audio
+11:50:29 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:30 INFO     larpchekr.audio audio: transcript → We're also happy to grab a flat design into code.  Let's say you do it.
+11:50:30 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:31 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:32 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:33 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:34 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:35 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:36 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:37 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:38 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:38 INFO     faster_whisper Processing audio with duration 00:10.000
+11:50:38 INFO     faster_whisper VAD filter removed 00:00.000 of audio
+11:50:39 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:40 INFO     larpchekr.audio audio: transcript → Up here there's a shear one. Yeah, share  Hand out a thought code. I'm just copy
+11:50:40 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:41 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:42 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:43 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:44 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:45 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:46 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:47 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:48 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:48 INFO     faster_whisper Processing audio with duration 00:10.000
+11:50:48 INFO     faster_whisper VAD filter removed 00:00.000 of audio
+11:50:49 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:50 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:50 INFO     larpchekr.audio audio: transcript → I'm not a predator.  Any age.  Any age.  Oh, even.  If you like the regular co-p
+11:50:51 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:52 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:53 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:54 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:55 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:56 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:57 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:58 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:50:58 INFO     faster_whisper Processing audio with duration 00:10.250
+11:50:58 INFO     faster_whisper VAD filter removed 00:00.000 of audio
+11:50:59 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:51:00 INFO     larpchekr.audio audio: transcript → I'm going to put that in the middle of the cup of oil.  Put that below and then 
+11:51:00 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:51:01 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:51:02 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:51:03 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:51:04 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:51:05 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:51:06 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:51:07 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:51:08 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:51:09 INFO     faster_whisper Processing audio with duration 00:10.250
+11:51:09 INFO     faster_whisper VAD filter removed 00:00.000 of audio
+11:51:09 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:51:10 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:51:10 INFO     larpchekr.audio audio: transcript → I'll keep it from gas, you know?  Yeah.  Oh, I think it's good.  And in the way 
+11:51:11 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:51:12 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:51:13 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:51:14 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:51:15 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:51:16 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:51:17 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:51:18 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:51:18 WARNING  larpchekr.ws_client ws: disconnected (received 1012 (service restart); then sent 1012 (service restart)) — reconnecting in 2.0s
+11:51:18 INFO     larpchekr.hardware.led LED → degraded (1.0, 1.0, 0.0)
+11:51:19 INFO     faster_whisper Processing audio with duration 00:10.000
+11:51:19 INFO     faster_whisper VAD filter removed 00:00.000 of audio
+11:51:19 INFO     larpchekr.preview_server preview: phase → connecting  ws://100.76.124.67:8000/ws/pi
+11:51:20 INFO     larpchekr.ws_client ws: connecting to ws://100.76.124.67:8000/ws/pi?token=pi_rpi-001_ERdGJEZp7qcFfrVZ
+11:51:20 INFO     larpchekr.preview_server preview: phase → connecting  ws://100.76.124.67:8000/ws/pi
+11:51:20 INFO     larpchekr.audio audio: transcript → I'm going to go to the bathroom.  I'm going to go to the bathroom.  I'm going to
+11:51:21 INFO     larpchekr.preview_server preview: phase → connecting  ws://100.76.124.67:8000/ws/pi
+11:51:22 INFO     larpchekr.preview_server preview: phase → connecting  ws://100.76.124.67:8000/ws/pi
+11:51:22 INFO     larpchekr.ws_client ws: connected
+11:51:22 INFO     larpchekr.ws_client ws: draining buffer (0.0s of audio)
+11:51:22 INFO     larpchekr.ws_client ws: buffer drain complete
+11:51:22 INFO     larpchekr.hardware.led LED → armed (0.0, 0.0, 1.0)
+11:51:23 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:51:24 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:51:25 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:51:26 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:51:27 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:51:28 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:51:29 INFO     faster_whisper Processing audio with duration 00:10.000
+11:51:29 INFO     faster_whisper VAD filter removed 00:00.000 of audio
+11:51:29 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:51:30 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:51:31 INFO     larpchekr.audio audio: transcript → And then like this is the scale.  The space is for like this, this lip.  Oh.  An
+11:51:31 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:51:32 INFO     larpchekr.preview_server preview: phase → recording  1924623627fe
+11:51:32 INFO     __main__ shutdown signal received
+11:51:39 INFO     __main__ shutdown signal received

@@ -232,6 +232,27 @@ async def handle_pi_ws(ws: WebSocket, token: str | None = None) -> None:
                     battery, cpu_temp, buffer_sec, session_id)
             if event_type == "session_start" and session_id:
                 log.info('{"event": "session_start", "session_id": "%s", "request_id": "%s"}', session_id, request_id)
+                existing_session = await database().sessions.find_one({"id": session_id})
+                if existing_session is None:
+                    event = await database().events.find_one()
+                    now = datetime.now(timezone.utc)
+                    await database().sessions.insert_one({
+                        "id": session_id,
+                        "event_id": event["id"] if event else None,
+                        "wearer_id": None,
+                        "self_user_id": None,
+                        "subject_id": None,
+                        "partner_attendee_id": None,
+                        "partner_consent_status": "pending",
+                        "started_at": now,
+                        "ended_at": None,
+                        "device_id": data.get("device_id", "pi"),
+                        "pi_device_id": data.get("device_id", "pi"),
+                        "score": 0.0,
+                        "score_label": "mostly honest",
+                    })
+                    log.info('{"event": "session_created", "session_id": "%s", "event_id": "%s", "request_id": "%s"}',
+                        session_id, event["id"] if event else None, request_id)
                 await ws.send_json(envelope("session_ack", {"session_id": session_id}, session_id))
                 await manager.send_phone(session_id, "session_status", {"session_id": session_id, "status": "active", "partner": None})
             if event_type == "session_end":
