@@ -9,7 +9,7 @@ import uuid
 
 from larpchekr.audio import AudioCapture
 from larpchekr.buffer import RingBuffer
-from larpchekr.camera import CameraCapture
+from larpchekr.camera import CameraCapture, FaceDetector
 from larpchekr.config import settings
 from larpchekr.hardware.button import Button
 from larpchekr.hardware.haptic import HapticDriver
@@ -121,30 +121,24 @@ async def _pair_with_preview(
     pairing._save_token(pi_token)
 
 
-async def _button_loop(
-    button: Button,
-    ws_client: WsClient,
-    stop_event: asyncio.Event,
-) -> None:
-    log.info("button: loop started")
-    recording = False
-    session_id: str | None = None
-    while not stop_event.is_set():
-        try:
-            await asyncio.wait_for(button.wait_press(), timeout=0.5)
-        except asyncio.TimeoutError:
-            continue
-        if not recording:
-            session_id = uuid.uuid4().hex
-            await ws_client.send_session_start(session_id)
-            log.info("button: session start id=%s", session_id)
-            recording = True
-        else:
-            if session_id:
-                await ws_client.send_session_end(session_id, "manual")
-            log.info("button: session end")
-            recording = False
-            session_id = None
+def _make_face_callbacks(ws_client: WsClient) -> tuple:
+    """Return (on_start, on_end) async callbacks for the face detector."""
+    _session_id: list[str | None] = [None]
+
+    async def on_start() -> None:
+        sid = uuid.uuid4().hex
+        _session_id[0] = sid
+        await ws_client.send_session_start(sid)
+        log.info("face: session started id=%s", sid)
+
+    async def on_end() -> None:
+        sid = _session_id[0]
+        if sid:
+            await ws_client.send_session_end(sid, "face_lost")
+            log.info("face: session ended id=%s", sid)
+        _session_id[0] = None
+
+    return on_start, on_end
 
 
 async def _state_watcher(
@@ -215,6 +209,11 @@ async def main() -> None:
 
     audio = AudioCapture(fake=settings.fake_hardware)
     camera = CameraCapture(fake=settings.fake_hardware)
+    face_detector = FaceDetector(
+        fake=settings.fake_hardware,
+        start_frames=settings.face_start_frames,
+        end_frames=settings.face_end_frames,
+    )
     button = Button(fake=settings.fake_hardware)
 
     def _on_signal() -> None:
@@ -225,6 +224,11 @@ async def main() -> None:
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, _on_signal)
 
+    # Shared queue: preview_run pushes raw frames, face_detector reads them.
+    # maxsize=2 so the detector always gets a fresh frame and never backs up.
+    face_frame_queue: asyncio.Queue = asyncio.Queue(maxsize=2)
+
+    on_face_start, on_face_end = _make_face_callbacks(ws_client)
     try:
         await asyncio.gather(
             preview_task,
@@ -232,17 +236,28 @@ async def main() -> None:
             ws_client.heartbeat_loop(lambda: buffer.buffered_seconds),
             audio.run(
                 ws_client.send_envelope,
-                ws_client.send_binary,
                 lambda: ws_client.session_id,
                 stop_event,
+                on_transcript=preview.set_last_transcript,
             ),
             camera.run(
                 ws_client.send_envelope,
                 lambda: ws_client.session_id,
                 stop_event,
             ),
-            camera.preview_run(preview.update_frame, stop_event),
-            _button_loop(button, ws_client, stop_event),
+            camera.preview_run(
+                preview.update_frame,
+                stop_event,
+                get_overlay=preview.get_camera_overlay,
+                face_queue=face_frame_queue,
+            ),
+            face_detector.run(
+                face_frame_queue,
+                on_face_start,
+                on_face_end,
+                stop_event,
+                on_face_update=preview.set_face_detected,
+            ),
             _state_watcher(ws_client, preview, stop_event),
         )
     finally:

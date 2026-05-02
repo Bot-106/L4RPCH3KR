@@ -1,30 +1,33 @@
 """
-Audio capture with VAD gating.
+Audio capture with VAD gating and on-device STT.
 
 Real mode: sounddevice, 16kHz mono PCM s16le, 250ms frames.
-Fake mode: generated sine-wave audio, VAD always active.
-
-Each binary frame is prefixed with an 8-byte int64 big-endian ms timestamp
-so the backend can reorder within a 1-second window.
+Fake mode: sends browser_transcript text events on a timer.
 
 VAD logic (real mode):
   - Split each 250ms frame into 25 × 10ms sub-frames.
   - Run webrtcvad aggressiveness=2 on each.
   - If ≥ SPEECH_RATIO are speech → chunk is speech.
-  - SILENT → SPEAKING: emit audio_meta envelope, then the frame.
-  - SPEAKING  → SILENT: after HANGOVER_FRAMES consecutive silent chunks.
+  - SPEAKING → SILENT: after HANGOVER_FRAMES consecutive silent chunks,
+    collect the buffered PCM, run faster-whisper locally, and send a
+    browser_transcript envelope with the transcript text.
 """
 from __future__ import annotations
 
 import asyncio
 import logging
-import math
-import struct
-import time
 from collections.abc import Awaitable, Callable
 from datetime import UTC
 
 log = logging.getLogger(__name__)
+
+# Fake-mode transcript phrases cycled in order
+_FAKE_PHRASES = [
+    "Hi, I'm a software engineer at Google with ten years of experience in distributed systems.",
+    "I've published three papers on machine learning and hold a degree from MIT.",
+    "My open-source project has over five thousand stars on GitHub.",
+    "I led the team that built the infrastructure for a major cloud provider.",
+]
 
 SAMPLE_RATE = 16000
 CHANNELS = 1
@@ -44,27 +47,21 @@ SPEECH_RATIO = 0.4  # fraction of sub-frames that must be speech
 HANGOVER_FRAMES = 8  # 8 × 250ms = 2s hangover
 
 SendEnvelopeFn = Callable[[dict], Awaitable[None]]
-SendBinaryFn = Callable[[bytes], Awaitable[None]]
+TranscriptCallback = Callable[[str], None]
 
 
-def _make_audio_frame_header(ms: int) -> bytes:
-    return struct.pack(">q", ms)
-
-
-def _make_audio_meta_envelope(session_id: str | None) -> dict:
+def _make_browser_transcript_envelope(text: str, session_id: str | None) -> dict:
     import uuid
     from datetime import datetime
     return {
         "id": uuid.uuid4().hex,
-        "type": "audio_meta",
+        "type": "browser_transcript",
         "ts": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "session_id": session_id,
         "data": {
-            "sample_rate": SAMPLE_RATE,
-            "encoding": "pcm_s16le",
-            "channels": CHANNELS,
-            "frame_ms": FRAME_MS,
+            "text": text,
             "speaker_hint": "self",
+            "session_id": session_id,
         },
     }
 
@@ -73,12 +70,19 @@ class AudioCapture:
     def __init__(self, fake: bool = False) -> None:
         self._fake = fake
         self._vad = None
+        self._transcriber = None
         if not fake:
             try:
                 import webrtcvad  # type: ignore[import]
                 self._vad = webrtcvad.Vad(2)
             except Exception as exc:
                 log.warning("audio: webrtcvad init failed (%s) — VAD disabled", exc)
+
+    def _get_transcriber(self):
+        if self._transcriber is None:
+            from larpchekr.transcriber import Transcriber
+            self._transcriber = Transcriber()
+        return self._transcriber
 
     def _is_speech(self, pcm: bytes) -> bool:
         """Vote across 25 × 10ms sub-frames."""
@@ -100,68 +104,52 @@ class AudioCapture:
     async def run(
         self,
         send_envelope: SendEnvelopeFn,
-        send_binary: SendBinaryFn,
         get_session_id: Callable[[], str | None],
         stop_event: asyncio.Event,
+        on_transcript: TranscriptCallback | None = None,
     ) -> None:
         if self._fake:
-            await self._run_fake(send_envelope, send_binary, get_session_id, stop_event)
+            await self._run_fake(send_envelope, get_session_id, stop_event, on_transcript)
         else:
-            await self._run_real(send_envelope, send_binary, get_session_id, stop_event)
+            await self._run_real(send_envelope, get_session_id, stop_event, on_transcript)
 
     # ------------------------------------------------------------------
-    # Fake mode — generate sine-wave audio so the WS round-trip can be
-    # exercised without hardware. VAD is bypassed.
+    # Fake mode — emit pre-written transcript phrases on a timer so the
+    # WS round-trip can be exercised without hardware or STT.
     # ------------------------------------------------------------------
     async def _run_fake(
         self,
         send_envelope: SendEnvelopeFn,
-        send_binary: SendBinaryFn,
         get_session_id: Callable[[], str | None],
         stop_event: asyncio.Event,
+        on_transcript: TranscriptCallback | None = None,
     ) -> None:
-        import struct as _struct
-
-        log.info("audio: FAKE mode — generating sine-wave audio at 440 Hz")
-        meta_sent = False
-        phase = 0.0
-        freq = 440.0
-        amplitude = 8000  # well below int16 max
-
+        log.info("audio: FAKE mode — sending scripted transcript phrases every 8s")
+        phrase_idx = 0
         while not stop_event.is_set():
+            await asyncio.sleep(8.0)
+            if stop_event.is_set():
+                break
             session_id = get_session_id()
             if session_id is None:
-                await asyncio.sleep(0.1)
-                meta_sent = False
                 continue
-
-            if not meta_sent:
-                await send_envelope(_make_audio_meta_envelope(session_id))
-                meta_sent = True
-
-            # Generate 250ms of sine wave
-            samples: list[int] = []
-            for i in range(FRAME_SAMPLES):
-                val = int(amplitude * math.sin(2 * math.pi * freq * (phase + i) / SAMPLE_RATE))
-                samples.append(max(-32767, min(32767, val)))
-            phase = (phase + FRAME_SAMPLES) % SAMPLE_RATE
-
-            pcm = _struct.pack(f"<{FRAME_SAMPLES}h", *samples)
-            ms = int(time.time() * 1000)
-            header = _make_audio_frame_header(ms)
-            await send_binary(header + pcm)
-
-            await asyncio.sleep(FRAME_MS / 1000)
+            text = _FAKE_PHRASES[phrase_idx % len(_FAKE_PHRASES)]
+            phrase_idx += 1
+            log.debug("audio: fake transcript → %s", text[:60])
+            if on_transcript:
+                on_transcript(text)
+            await send_envelope(_make_browser_transcript_envelope(text, session_id))
 
     # ------------------------------------------------------------------
-    # Real mode — sounddevice callback fills an asyncio queue
+    # Real mode — sounddevice callback fills an asyncio queue; on speech
+    # end, accumulated PCM is transcribed locally and sent as text.
     # ------------------------------------------------------------------
     async def _run_real(
         self,
         send_envelope: SendEnvelopeFn,
-        send_binary: SendBinaryFn,
         get_session_id: Callable[[], str | None],
         stop_event: asyncio.Event,
+        on_transcript: TranscriptCallback | None = None,
     ) -> None:
         try:
             import numpy as np  # type: ignore[import]
@@ -177,7 +165,6 @@ class AudioCapture:
         def callback(indata: np.ndarray, frames: int, t: object, status: object) -> None:
             if status:
                 log.debug("sounddevice status: %s", status)
-            # indata is float32 in [-1, 1]; convert to int16
             pcm = (indata[:, 0] * 32767).astype("int16").tobytes()
             try:
                 loop.call_soon_threadsafe(queue.put_nowait, pcm)
@@ -194,7 +181,7 @@ class AudioCapture:
             log.info("audio: sounddevice stream started")
             speaking = False
             silent_count = 0
-            audio_buffer: list[bytes] = []  # Buffer audio frames during speech
+            speech_pcm = bytearray()
 
             while not stop_event.is_set():
                 try:
@@ -204,9 +191,8 @@ class AudioCapture:
 
                 session_id = get_session_id()
                 if session_id is None:
-                    # No active session — don't send
                     speaking = False
-                    audio_buffer.clear()
+                    speech_pcm.clear()
                     continue
 
                 is_sp = self._is_speech(pcm)
@@ -215,21 +201,33 @@ class AudioCapture:
                     silent_count = 0
                     if not speaking:
                         speaking = True
-                        audio_buffer.clear()
-                        await send_envelope(_make_audio_meta_envelope(session_id))
+                        speech_pcm.clear()
                         log.debug("audio: speech started")
-                    # Buffer the audio frame during speech (don't send yet)
-                    ms = int(time.time() * 1000)
-                    header = _make_audio_frame_header(ms)
-                    audio_buffer.append(header + pcm)
+                    speech_pcm.extend(pcm)
                 else:
+                    if speaking:
+                        speech_pcm.extend(pcm)  # include trailing frame in segment
                     silent_count += 1
                     if silent_count > HANGOVER_FRAMES:
-                        if speaking:
-                            log.debug("audio: silence detected — hangover expired, sending buffered audio")
-                            # Send all buffered audio at once when speech ends
-                            for buffered_frame in audio_buffer:
-                                await send_binary(buffered_frame)
-                            audio_buffer.clear()
+                        if speaking and speech_pcm:
+                            log.debug(
+                                "audio: speech ended (%d bytes) — transcribing",
+                                len(speech_pcm),
+                            )
+                            captured = bytes(speech_pcm)
+                            speech_pcm.clear()
+                            transcriber = self._get_transcriber()
+                            text = await loop.run_in_executor(
+                                None, transcriber.transcribe, captured
+                            )
+                            if text:
+                                log.info("audio: transcript → %s", text[:80])
+                                if on_transcript:
+                                    on_transcript(text)
+                                await send_envelope(
+                                    _make_browser_transcript_envelope(text, session_id)
+                                )
+                            else:
+                                log.debug("audio: transcription returned empty")
                         speaking = False
                         continue

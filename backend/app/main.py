@@ -3,7 +3,6 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-import numpy as np
 from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -11,25 +10,10 @@ from app import serializers
 from app.config import settings
 from app.db import database
 from app.identity.face_matcher import face_matcher
-from app.pipeline.asr import transcribe_pcm_frame
 from app.pipeline.diarize import classify_speaker
 from app.pipeline.orchestrator import process_simulated_utterance
 from app.routers import router
 from app.ws_manager import envelope, manager
-
-# --- Voice Activity Detection (energy-based) ---
-_VAD_SILENCE_RMS = 400        # int16 amplitude units; below this = silence (~-38 dBFS)
-_VAD_SILENCE_FRAMES = 3       # consecutive silent Pi frames (~750 ms) before flushing
-_VAD_MAX_BUFFER_SECS = 20     # hard cap — flush even if no pause detected
-
-
-def _frame_is_silent(frame: bytes) -> bool:
-    """Return True if the PCM frame is below the silence threshold."""
-    if not frame or len(frame) < 2:
-        return True
-    pcm = np.frombuffer(frame, dtype=np.int16)
-    rms = float(np.sqrt(np.mean(pcm.astype(np.float32) ** 2)))
-    return rms < _VAD_SILENCE_RMS
 
 log = logging.getLogger(__name__)
 
@@ -137,27 +121,12 @@ async def handle_pi_ws(ws: WebSocket, token: str | None = None) -> None:
     manager.pis.add(ws)
     session_id: str | None = None
     event_id: str | None = None
-    utterance_count = 0
     speaker_hint: str | None = None
-    audio_sample_rate = 16000
-    audio_buffer = bytearray()
     try:
         while True:
             message = await ws.receive()
             if "bytes" in message:
-                if session_id:
-                    audio_buffer.extend(message["bytes"] or b"")
-                    min_chunk_bytes = int(settings.asr_chunk_seconds * audio_sample_rate * 2)
-                    if len(audio_buffer) < min_chunk_bytes:
-                        continue
-                    utterance_count += 1
-                    chunk = bytes(audio_buffer)
-                    audio_buffer.clear()
-                    text = transcribe_pcm_frame(chunk, sample_rate=audio_sample_rate)
-                    if text:
-                        speaker, confidence = classify_speaker(speaker_hint)
-                        await process_simulated_utterance(database(), session_id, text, speaker, confidence)
-                continue
+                continue  # Pi no longer sends binary audio; ignore stale frames
             if "text" not in message:
                 continue
             payload = json.loads(message["text"])
@@ -175,7 +144,6 @@ async def handle_pi_ws(ws: WebSocket, token: str | None = None) -> None:
                 session_id = data["session_id"]
             if event_type == "audio_meta":
                 speaker_hint = data.get("speaker_hint")
-                audio_sample_rate = int(data.get("sample_rate_hz") or audio_sample_rate)
             if event_type == "browser_transcript" and session_id:
                 text = str(data.get("text") or "").strip()
                 if text:
@@ -206,12 +174,6 @@ async def handle_pi_ws(ws: WebSocket, token: str | None = None) -> None:
                     pi_payload = {"session_id": session_id, "attendee_id": None, "attendee": None, "confidence": 0.0, "method": "profile_picture_similarity", "reason": reason}
                     await manager.send_phone(session_id, "partner_identified", pi_payload)
                     await ws.send_json(envelope("subject_resolved", pi_payload, session_id))
-            if event_type == "session_end" and session_id and audio_buffer:
-                text = transcribe_pcm_frame(bytes(audio_buffer), sample_rate=audio_sample_rate)
-                audio_buffer.clear()
-                if text:
-                    speaker, confidence = classify_speaker(speaker_hint)
-                    await process_simulated_utterance(database(), session_id, text, speaker, confidence)
             if event_type == "session_start" and session_id:
                 await ws.send_json(envelope("session_ack", {"session_id": session_id}, session_id))
                 await manager.send_phone(session_id, "session_status", {"session_id": session_id, "status": "active", "partner": None})

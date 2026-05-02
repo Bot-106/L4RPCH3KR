@@ -23,6 +23,8 @@ class Settings:
     log_level: str
     fake_hardware: bool
     preview_port: int
+    face_start_frames: int
+    face_end_frames: int
 
     def __init__(self) -> None:
         self.backend_ws = os.environ.get(
@@ -38,6 +40,10 @@ class Settings:
         self.log_level = os.environ.get("LARPCHEKR_LOG_LEVEL", "info").upper()
         self.fake_hardware = _bool(os.environ.get("LARPCHEKR_FAKE_HARDWARE"), False)
         self.preview_port = int(os.environ.get("LARPCHEKR_PREVIEW_PORT", "8080"))
+        # Face must be present for this many consecutive frames to start a session
+        self.face_start_frames = int(os.environ.get("LARPCHEKR_FACE_START_FRAMES", "3"))
+        # Face must be absent for this many consecutive frames to end a session
+        self.face_end_frames = int(os.environ.get("LARPCHEKR_FACE_END_FRAMES", "15"))
 
     @property
     def pi_token(self) -> str:

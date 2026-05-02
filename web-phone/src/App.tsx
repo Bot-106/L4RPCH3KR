@@ -4,7 +4,6 @@ import { useAuthStore } from '@/stores/authStore'
 
 import { SignInScreen } from '@/screens/onboarding/SignInScreen'
 import { GithubConnectScreen } from '@/screens/onboarding/GithubConnectScreen'
-import { VoiceCalibrationScreen } from '@/screens/onboarding/VoiceCalibrationScreen'
 import { PiPairScreen } from '@/screens/onboarding/PiPairScreen'
 import { LiveScreen } from '@/screens/live/LiveScreen'
 import { ShowQrScreen } from '@/screens/pair/ShowQrScreen'
@@ -31,7 +30,6 @@ function RootRedirect() {
   const { isAuthed, user } = useAuthStore()
   if (!isAuthed) return <Navigate to="/onboarding/signin" replace />
   if (!user?.github_login) return <Navigate to="/onboarding/github" replace />
-  if (!user?.voice_calibration_id) return <Navigate to="/onboarding/voice" replace />
   return <Navigate to="/live" replace />
 }
 
@@ -43,7 +41,6 @@ const router = createBrowserRouter([
     element: <RequireAuth />,
     children: [
       { path: '/onboarding/github', element: <GithubConnectScreen /> },
-      { path: '/onboarding/voice', element: <VoiceCalibrationScreen /> },
       { path: '/onboarding/pair', element: <PiPairScreen /> },
       { path: '/live', element: <LiveScreen /> },
       { path: '/pair/show', element: <ShowQrScreen /> },

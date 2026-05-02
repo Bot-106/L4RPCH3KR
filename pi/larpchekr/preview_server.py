@@ -137,6 +137,25 @@ class PreviewServer:
         self._detail = ""
         self._started_at = time.monotonic()
         self._queues: list[asyncio.Queue[bytes]] = []
+        self._face_detected: bool = False
+        self._last_transcript: str = ""
+
+    def set_face_detected(self, detected: bool) -> None:
+        self._face_detected = detected
+
+    def set_last_transcript(self, text: str) -> None:
+        # Trim to fit within the 320px frame at small font
+        self._last_transcript = text[-72:] if len(text) > 72 else text
+
+    def get_camera_overlay(self) -> "list[tuple[str, tuple[int, int, int]]]":
+        """Return overlay lines for the camera preview, bottom-up."""
+        lines = []
+        if self._last_transcript:
+            lines.append((self._last_transcript, (200, 200, 200)))
+        face_label = "FACE: YES" if self._face_detected else "FACE: NO"
+        face_color = (50, 220, 50) if self._face_detected else (50, 50, 220)
+        lines.append((face_label, face_color))
+        return lines
 
     def set_state(self, state: str, detail: str = "") -> None:
         """Must be called from the event loop thread."""

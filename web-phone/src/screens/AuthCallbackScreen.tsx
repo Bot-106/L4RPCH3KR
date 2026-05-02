@@ -28,8 +28,6 @@ export function AuthCallbackScreen() {
         // Route to first incomplete onboarding step
         if (!res.user.github_login) {
           navigate('/onboarding/github', { replace: true })
-        } else if (!res.user.voice_calibration_id) {
-          navigate('/onboarding/voice', { replace: true })
         } else {
           navigate('/live', { replace: true })
         }
