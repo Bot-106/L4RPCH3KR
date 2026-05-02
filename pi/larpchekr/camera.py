@@ -23,6 +23,11 @@ MAX_WIDTH = 640
 MAX_HEIGHT = 480
 JPEG_QUALITY = 75
 
+# Preview stream — lower res/quality for low latency
+PREVIEW_WIDTH = 320
+PREVIEW_HEIGHT = 240
+PREVIEW_JPEG_QUALITY = 45
+
 SendEnvelopeFn = Callable[[dict], Awaitable[None]]
 FrameCallback = Callable[[bytes], None]
 
@@ -76,18 +81,50 @@ def _make_fake_frame() -> object:
     return frame
 
 
+def _open_first_camera(cv2: object) -> object | None:
+    """Probe low-index /dev/videoN nodes and return the first that can capture.
+
+    Pi 5 ISP nodes live at video20+; USB/UVC cameras are typically below 10.
+    """
+    import glob
+
+    candidates = sorted(
+        (p for p in glob.glob("/dev/video*")
+         if p[len("/dev/video"):].isdigit() and int(p[len("/dev/video"):]) < 20),
+        key=lambda p: int(p[len("/dev/video"):]),
+    )
+    for path in candidates:
+        cap = cv2.VideoCapture(path)  # type: ignore[union-attr]
+        if cap.isOpened():
+            ok, _ = cap.read()
+            if ok:
+                log.debug("camera: found capture device at %s", path)
+                return cap
+        cap.release()
+    return None
+
+
 class CameraCapture:
     def __init__(self, fake: bool = False) -> None:
         self._fake = fake
         self._cap = None
         if not fake:
             try:
+                import glob
                 import cv2  # type: ignore[import]
-                self._cap = cv2.VideoCapture(0)
-                if not self._cap.isOpened():
-                    log.warning("camera: no camera device — falling back to fake")
+                self._cap = _open_first_camera(cv2)
+                if self._cap is None or not self._cap.isOpened():
+                    log.warning("camera: no capture device found — falling back to fake")
+                    if self._cap:
+                        self._cap.release()
                     self._cap = None
                     self._fake = True
+                else:
+                    # Lower capture resolution to reduce USB bandwidth and encode time
+                    self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, PREVIEW_WIDTH)
+                    self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, PREVIEW_HEIGHT)
+                    # Minimal internal buffer so reads return the freshest frame
+                    self._cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
             except Exception as exc:
                 log.warning("camera: opencv init failed (%s) — falling back to fake", exc)
                 self._fake = True
@@ -137,6 +174,27 @@ class CameraCapture:
             jpeg_bytes, _, _ = _encode_jpeg(frame)
             return jpeg_bytes
         except Exception as exc:
+            log.warning("camera: snapshot capture failed: %s", exc)
+            return None
+
+    def _capture_preview_jpeg_sync(self) -> bytes | None:
+        """Low-res, low-quality JPEG for the MJPEG stream — minimise latency."""
+        try:
+            import cv2  # type: ignore[import]
+
+            if self._fake:
+                frame = _make_fake_frame()
+            else:
+                ok, frame = self._cap.read()  # type: ignore[union-attr]
+                if not ok:
+                    frame = _make_fake_frame()
+            ok, buf = cv2.imencode(
+                ".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, PREVIEW_JPEG_QUALITY]
+            )
+            if not ok:
+                return None
+            return bytes(buf)
+        except Exception as exc:
             log.warning("camera: preview capture failed: %s", exc)
             return None
 
@@ -144,14 +202,14 @@ class CameraCapture:
         self,
         on_frame: FrameCallback,
         stop_event: asyncio.Event,
-        fps: int = 2,
+        fps: int = 5,
     ) -> None:
         """Capture continuously at `fps` and push JPEG bytes to on_frame."""
         interval = 1.0 / fps
         loop = asyncio.get_running_loop()
         log.info("camera: preview loop started (%d fps, fake=%s)", fps, self._fake)
         while not stop_event.is_set():
-            jpeg = await loop.run_in_executor(None, self._capture_jpeg_sync)
+            jpeg = await loop.run_in_executor(None, self._capture_preview_jpeg_sync)
             if jpeg:
                 on_frame(jpeg)
             await asyncio.sleep(interval)
