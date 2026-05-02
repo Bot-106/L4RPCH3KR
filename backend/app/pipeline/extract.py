@@ -61,7 +61,7 @@ async def _extract_with_anthropic(text: str) -> list[dict]:
     try:
         msg = await client.messages.create(
             model=model,
-            max_tokens=512,
+            max_tokens=2048,
             system=_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": text}],
         )
@@ -69,7 +69,7 @@ async def _extract_with_anthropic(text: str) -> list[dict]:
         print(f"[EXTRACT] API error status={e.status_code} body={e.body}")
         raise
     raw = msg.content[0].text.strip() if msg.content else ""
-    print(f"[EXTRACT] raw response ({len(raw)} chars): {raw[:300]}")
+    print(f"[EXTRACT] raw response ({len(raw)} chars): {raw}")
     if not raw:
         return []
     # Strip markdown fences if present
@@ -90,7 +90,7 @@ async def _extract_with_openai(text: str) -> list[dict]:
             {"role": "system", "content": _SYSTEM_PROMPT},
             {"role": "user", "content": text},
         ],
-        max_tokens=512,
+        max_tokens=2048,
     )
     return json.loads(resp.choices[0].message.content.strip())
 
@@ -166,7 +166,7 @@ async def extract_claim(text: str, utterance_id: str) -> dict | None:
             fn = _extract_with_openai
         else:
             return _keyword_fallback(text, utterance_id)
-        claims = await asyncio.wait_for(fn(text), timeout=8.0)
+        claims = await asyncio.wait_for(fn(text), timeout=15.0)
         if claims:
             c = claims[0]
             return _make_claim(
