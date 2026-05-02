@@ -769,11 +769,14 @@ Tasks — respond ONLY with a single JSON object, no markdown fences:
         "profile_larp_label": profile_label,
     }
 
-    # Update the field the dashboard list and summary actually render, and cache
-    # expensive external profile data so opening rows doesn't burn API tokens.
+    # Cache profile data and update profile_larp_score (the static LinkedIn/GitHub
+    # comparison). Crucially: do NOT clobber larp_score with profile_score — the
+    # live transcript eval owns larp_score and pushes higher values via
+    # update_attendee_larp_score. Write max() so refreshes never lower it.
+    combined_larp_score = max(profile_score, live_score)
     await db.attendees.update_one(
         {"id": attendee_id},
-        {"$set": {"larp_score": profile_score, "profile_larp_score": profile_score, "profile_summary": profile_summary, "profile_summary_cached_at": cached_at}}
+        {"$set": {"larp_score": combined_larp_score, "profile_larp_score": profile_score, "profile_summary": profile_summary, "profile_summary_cached_at": cached_at}}
     )
     attendee = await db.attendees.find_one({"id": attendee_id, "event_id": event_id}) or attendee
     
