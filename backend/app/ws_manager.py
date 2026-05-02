@@ -19,18 +19,31 @@ class WsManager:
     def __init__(self) -> None:
         self.phones: dict[str, set[WebSocket]] = {}
         self.pis: set[WebSocket] = set()
+        self._global_phones: set[WebSocket] = set()
 
     async def subscribe_phone(self, session_id: str, ws: WebSocket) -> None:
         self.phones.setdefault(session_id, set()).add(ws)
 
+    async def subscribe_global(self, ws: WebSocket) -> None:
+        self._global_phones.add(ws)
+
     def unsubscribe(self, ws: WebSocket) -> None:
         self.pis.discard(ws)
+        self._global_phones.discard(ws)
         for subscribers in self.phones.values():
             subscribers.discard(ws)
 
     async def send_phone(self, session_id: str, event_type: str, data: dict[str, Any]) -> None:
         message = json.dumps(envelope(event_type, data, session_id))
         for ws in list(self.phones.get(session_id, set())):
+            try:
+                await ws.send_text(message)
+            except RuntimeError:
+                self.unsubscribe(ws)
+
+    async def broadcast_global(self, event_type: str, data: dict[str, Any]) -> None:
+        message = json.dumps(envelope(event_type, data))
+        for ws in list(self._global_phones):
             try:
                 await ws.send_text(message)
             except RuntimeError:

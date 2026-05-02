@@ -116,7 +116,10 @@ async def handle_phone_ws(ws: WebSocket, token: str | None = None) -> None:
                 session_id,
                 request_id,
             )
-            if event_type == "subscribe_session" and session_id:
+            if event_type == "subscribe_global":
+                await manager.subscribe_global(ws)
+                await ws.send_json(envelope("global_subscribed", {}, None))
+            elif event_type == "subscribe_session" and session_id:
                 await manager.subscribe_phone(session_id, ws)
                 await ws.send_json(envelope("session_status", {"session_id": session_id, "status": "active", "partner": None}, session_id))
             elif event_type == "unsubscribe_session":
@@ -245,9 +248,10 @@ async def handle_pi_ws(ws: WebSocket, token: str | None = None) -> None:
                 if existing_session is None:
                     event = await database().events.find_one()
                     now = datetime.now(timezone.utc)
+                    event_id = event["id"] if event else None
                     await database().sessions.insert_one({
                         "id": session_id,
-                        "event_id": event["id"] if event else None,
+                        "event_id": event_id,
                         "wearer_id": None,
                         "self_user_id": None,
                         "subject_id": None,
@@ -261,9 +265,12 @@ async def handle_pi_ws(ws: WebSocket, token: str | None = None) -> None:
                         "score_label": "mostly honest",
                     })
                     log.info('{"event": "session_created", "session_id": "%s", "event_id": "%s", "request_id": "%s"}',
-                        session_id, event["id"] if event else None, request_id)
+                        session_id, event_id, request_id)
+                else:
+                    event_id = existing_session.get("event_id")
                 await ws.send_json(envelope("session_ack", {"session_id": session_id}, session_id))
                 await manager.send_phone(session_id, "session_status", {"session_id": session_id, "status": "active", "partner": None})
+                await manager.broadcast_global("session_available", {"session_id": session_id, "event_id": event_id})
             if event_type == "session_end":
                 reason = data.get("reason", "unknown")
                 log.info('{"event": "session_end", "reason": "%s", "session_id": "%s", "request_id": "%s"}', reason, session_id, request_id)

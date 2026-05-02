@@ -79,6 +79,7 @@ export default function LaptopLivePage({ params }: { params: Promise<{ eventId: 
   const [sttStatus, setSttStatus] = useState<SttStatus>("unknown");
   const [interimTranscript, setInterimTranscript] = useState("");
   const [subject, setSubject] = useState<SubjectIdentity | null>(null);
+  const [piSessionId, setPiSessionId] = useState<string | null>(null);
 
   const isLive = status === "live" || status === "connecting" || status === "ready";
 
@@ -198,11 +199,16 @@ export default function LaptopLivePage({ params }: { params: Promise<{ eventId: 
       phoneWsRef.current = phoneWs;
 
       phoneWs.onopen = () => {
+        phoneWs.send(JSON.stringify(envelope("subscribe_global", {}, null)));
         phoneWs.send(JSON.stringify(envelope("subscribe_session", { session_id: sid }, sid)));
       };
       phoneWs.onmessage = (message) => {
         const parsed = JSON.parse(message.data as string) as WsEnvelope<Record<string, unknown>>;
-        if (parsed.type === "transcript_update" && "utterances" in parsed.data) {
+        if (parsed.type === "session_available" && parsed.data.session_id) {
+          const piSid = String(parsed.data.session_id);
+          phoneWs.send(JSON.stringify(envelope("subscribe_session", { session_id: piSid }, piSid)));
+          setPiSessionId(piSid);
+        } else if (parsed.type === "transcript_update" && "utterances" in parsed.data) {
           setUtterances((rows) => [...rows, ...(parsed.data.utterances as Utterance[])].slice(-30));
         } else if (parsed.type === "claim_detected" && "claim" in parsed.data) {
           setClaims((rows) => [parsed.data.claim as Claim, ...rows].slice(0, 20));
@@ -299,7 +305,8 @@ export default function LaptopLivePage({ params }: { params: Promise<{ eventId: 
               <dl className="mt-4 grid gap-3 text-sm">
                 <div className="flex justify-between gap-3"><dt className="text-stone-400">Status</dt><dd className="font-bold">{status}</dd></div>
                 <div className="flex justify-between gap-3"><dt className="text-stone-400">Speech-to-text</dt><dd className="font-bold">{sttStatus}</dd></div>
-                <div className="flex justify-between gap-3"><dt className="text-stone-400">Session</dt><dd className="truncate font-mono text-xs">{sessionId ?? "not started"}</dd></div>
+                <div className="flex justify-between gap-3"><dt className="text-stone-400">Browser session</dt><dd className="truncate font-mono text-xs">{sessionId ?? "not started"}</dd></div>
+                <div className="flex justify-between gap-3"><dt className="text-stone-400">Pi session</dt><dd className="truncate font-mono text-xs">{piSessionId ?? "waiting…"}</dd></div>
                 <div className="flex justify-between gap-3"><dt className="text-stone-400">Flags</dt><dd className="font-bold">{flags.length}</dd></div>
                 <div className="flex justify-between gap-3"><dt className="text-stone-400">Haptic mirror</dt><dd className="font-bold">{lastHaptic ?? "none"}</dd></div>
               </dl>
