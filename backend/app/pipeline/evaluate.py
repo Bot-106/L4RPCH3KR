@@ -28,6 +28,7 @@ _ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 
 ALPHA_UP = 0.15
 ALPHA_DOWN = 0.08
+MAX_INCREASE_PER_FLAG = 0.05  # hard cap: each flag can raise the larpometer at most 5 points
 
 _SYSTEM = """\
 You are a LARP (credential inflation) detector at a tech networking event.
@@ -57,9 +58,22 @@ Return ONLY a JSON object:
 }"""
 
 
-def dampen(current: float, raw: float) -> float:
-    alpha = ALPHA_UP if raw > current else ALPHA_DOWN
-    return round(min(1.0, max(0.0, current + (raw - current) * alpha)), 4)
+def dampen(current: float, raw: float, flag_raised: bool) -> float:
+    """
+    Score change rules:
+      - No flag raised → score never goes UP. Down-dampens gently when raw is lower
+        (clean speech rebuilds credibility slowly).
+      - Flag raised → up-dampens, but the increase is hard-capped at
+        MAX_INCREASE_PER_FLAG (0.05 = 5 points) regardless of how spicy the LLM
+        thought this single window was.
+    """
+    if not flag_raised:
+        if raw < current:
+            return round(max(0.0, current + (raw - current) * ALPHA_DOWN), 4)
+        return current
+    raw_delta = (raw - current) * ALPHA_UP
+    capped_delta = min(MAX_INCREASE_PER_FLAG, max(0.0, raw_delta))
+    return round(min(1.0, current + capped_delta), 4)
 
 
 def _anthropic_key() -> str:
@@ -169,21 +183,23 @@ async def evaluate_transcript_larp(
         result = await _call_llm(profile_summary, text)
         raw_score = float(result.get("raw_score", 0.0))
         raw_score = max(0.0, min(1.0, raw_score))
+        flag_raised = bool(result.get("flag") and result.get("claim_text"))
 
         current_score = float(attendee.get("larp_score") or 0.0)
-        new_score = dampen(current_score, raw_score)
+        new_score = dampen(current_score, raw_score, flag_raised)
+        actual_delta = round(new_score - current_score, 4)
 
         log.warning(
-            '[EVAL] subject=%s raw_score=%.3f current=%.3f new=%.3f flag=%s',
-            subject_id, raw_score, current_score, new_score, result.get("flag")
+            '[EVAL] subject=%s raw_score=%.3f current=%.3f new=%.3f delta=%+.3f flag=%s',
+            subject_id, raw_score, current_score, new_score, actual_delta, flag_raised
         )
 
         flag_doc = None
-        if result.get("flag") and result.get("claim_text"):
+        if flag_raised:
             severity = result.get("severity", "low")
             if severity not in ("low", "medium", "high"):
                 severity = "low"
-            score_delta = {"low": 0.05, "medium": 0.10, "high": 0.20}[severity]
+            score_delta = actual_delta  # actual capped delta applied to the score
             flag_doc = {
                 "id": serializers.new_id(),
                 "claim_id": utterance_id,
