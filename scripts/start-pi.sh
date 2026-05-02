@@ -52,10 +52,20 @@ if [[ ! -d .venv ]]; then
   log "No .venv found — creating virtual environment..."
   python3 -m venv .venv
 fi
-if ! .venv/bin/python -c "import dotenv" &>/dev/null 2>&1; then
-  log "Installing dependencies into .venv..."
+
+# Check that all critical packages are present; reinstall if any are missing.
+_MISSING=0
+for _pkg in dotenv websockets faster_whisper; do
+  if ! .venv/bin/python -c "import $_pkg" &>/dev/null 2>&1; then
+    log "Missing package: $_pkg"
+    _MISSING=1
+  fi
+done
+if [[ $_MISSING -eq 1 ]]; then
+  log "Installing / updating dependencies..."
   .venv/bin/pip install --quiet -r requirements.txt
 fi
+unset _pkg _MISSING
 
 if [[ $FAKE -eq 1 ]]; then
   export LARPCHEKR_FAKE_HARDWARE=1
