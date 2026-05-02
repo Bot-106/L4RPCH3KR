@@ -8,7 +8,7 @@ Three subsystems plus an organizer dashboard:
 
 - **Pi capture device** — chest-worn Raspberry Pi 5 with USB camera/mic and a haptic motor. Captures audio + occasional video frames, streams to backend, vibrates when a flag fires.
 - **Phone app** — React Native (iOS + Android). Onboarding, live mode (status pill + flag cards), recap screen.
-- **Backend** — FastAPI server. The brain: transcription, speaker separation, claim extraction, profile comparison, scoring, websocket fan-out. Postgres + Redis.
+- **Backend** — FastAPI server. The brain: transcription, speaker separation, claim extraction, profile comparison, scoring, websocket fan-out. MongoDB.
 - **Organizer dashboard** — Next.js. CSV import of attendees with profile-link enrichment, CRUD, export.
 
 ## Architecture
@@ -24,7 +24,7 @@ Three subsystems plus an organizer dashboard:
                    │  │ Profile compare  │   │   ws://.../pi (back)
                    │  │ Scoring          │   │
                    │  └──────────────────┘   │
-                   │   Postgres   Redis      │
+                    │        MongoDB          │
                    └────┬───────────────┬────┘
                         │               │
                         │ REST          │ REST
@@ -50,8 +50,7 @@ Three websocket connections per active session: Pi↔backend, phone↔backend (o
 | Layer | Choice | Why |
 |-------|--------|-----|
 | Backend | **Python 3.11 + FastAPI** | Native fit with faster-whisper, pyannote, the LLM SDKs. Async websockets via Starlette. Faster to wire than splitting Node↔Python for ML. |
-| DB | **Postgres 15** | Attendees, claims, flags, sessions. Use `pgvector` for cached voice embeddings. |
-| Cache/PubSub | **Redis** | WS pub/sub between worker pods + short-lived session state. |
+| DB | **MongoDB 7** | Attendees, claims, flags, sessions, profile facts, and voice calibration docs. |
 | ASR | **faster-whisper** (`small.en` initial, `medium.en` if budget allows) | Runs on backend GPU, not the Pi. CTranslate2 backend is fast enough for near-real-time. |
 | Diarization | **speechbrain ECAPA-TDNN** speaker embeddings + cosine match | Lightweight; pairs well with onboarding voice calibration. |
 | Claim extraction | **LLM with structured output** (Anthropic Claude Sonnet 4.6 or OpenAI gpt-4.1-mini, structured JSON via tool-use) | Casual speech is too messy for rules+NER. Latency budget allows ~1.5s. |
@@ -59,7 +58,7 @@ Three websocket connections per active session: Pi↔backend, phone↔backend (o
 | Phone | **React Native + TypeScript** (bare RN, not Expo Go — we need native haptics + BLE-ish reliability for Pi pairing flows) | One codebase, iOS+Android. Bare RN gives us the dev-client flexibility without Expo's prebuild costs. Reconsider Expo dev client if onboarding pain dominates. |
 | Dashboard | **Next.js 15 (App Router) + TypeScript** | Same TS toolchain as phone for shared types. SSR not strictly required but useful for the org-internal dashboard. |
 | Auth | **Magic link** for attendees (email-only) + **GitHub OAuth** as a separate connect-step in onboarding | Hackathon-grade simplicity. GitHub login conflates auth with profile-linking; we want them separate. |
-| Deploy (demo) | Backend + dashboard on Fly.io or Railway, Postgres managed, Redis managed | One region, ship fast. |
+| Deploy (demo) | Backend + dashboard on Fly.io or Railway, MongoDB managed | One region, ship fast. |
 
 If a teammate disagrees, edit this table in a PR and explain why.
 
@@ -165,7 +164,7 @@ L4RPCH3KR/
 
 ## Local dev (full stack)
 
-Each subsystem has its own README with setup. To run the whole loop locally you need: Postgres, Redis, the backend, the dashboard, the phone (simulator or device), and either a real Pi or the Pi-simulator script in `backend/scripts/sim_pi.py` (TBD).
+Each subsystem has its own README with setup. To run the whole loop locally you need: MongoDB, the backend, the dashboard, the phone (simulator or device), and either a real Pi or the Pi-simulator script in `backend/scripts/sim_pi.py` (TBD).
 
 ## Open questions (top-level)
 
