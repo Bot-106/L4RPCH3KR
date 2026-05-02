@@ -1,4 +1,4 @@
-# start-backend.ps1 — run on the backend host (Windows, 100.76.124.67)
+# start-backend.ps1 - run on the backend host (Windows, 100.76.124.67)
 # Kills any existing instances, then (re)starts:
 #   MongoDB (Docker), FastAPI, dashboard Next.js
 # Usage:
@@ -12,7 +12,6 @@ $ErrorActionPreference = "Stop"
 
 $REPO = Split-Path -Parent $PSScriptRoot
 
-# ── helpers ───────────────────────────────────────────────────────────────────
 function Log($msg) { Write-Host "[$(Get-Date -Format 'HH:mm:ss')] $msg" }
 
 function Kill-OnPort($port) {
@@ -25,19 +24,19 @@ function Kill-OnPort($port) {
     }
 }
 
-# ── stop existing processes ───────────────────────────────────────────────────
+# --- stop existing processes ---
 Log "Stopping existing processes..."
-Get-Process -Name "uvicorn"  -ErrorAction SilentlyContinue | Stop-Process -Force
-Get-Process -Name "node"     -ErrorAction SilentlyContinue | Stop-Process -Force
+Get-Process -Name "uvicorn" -ErrorAction SilentlyContinue | Stop-Process -Force
+Get-Process -Name "node"    -ErrorAction SilentlyContinue | Stop-Process -Force
 Kill-OnPort 8000
 Kill-OnPort 3001
 Start-Sleep -Seconds 1
 
-# ── MongoDB (Docker) ──────────────────────────────────────────────────────────
+# --- MongoDB (Docker) ---
 Log "Starting MongoDB..."
 Set-Location $REPO
 docker compose -f infra/docker-compose.dev.yml up -d mongo
-# Wait for Mongo to be ready
+
 $mongoReady = $false
 for ($i = 0; $i -lt 10; $i++) {
     try {
@@ -47,9 +46,13 @@ for ($i = 0; $i -lt 10; $i++) {
     } catch {}
     Start-Sleep -Seconds 1
 }
-if ($mongoReady) { Log "MongoDB ready." } else { Log "WARNING: Could not confirm MongoDB is ready — continuing anyway." }
+if ($mongoReady) {
+    Log "MongoDB ready."
+} else {
+    Log "WARNING: Could not confirm MongoDB is ready - continuing anyway."
+}
 
-# ── Backend (FastAPI) ─────────────────────────────────────────────────────────
+# --- Backend (FastAPI) ---
 Log "Starting FastAPI on :8000..."
 Set-Location "$REPO\backend"
 
@@ -57,12 +60,13 @@ if (-not (Test-Path ".env")) {
     Log "ERROR: backend\.env not found. Copy .env.example and fill in secrets."
     exit 1
 }
+
 if (-not (Test-Path ".venv")) {
-    Log "No .venv found — creating virtual environment..."
+    Log "No .venv found - creating virtual environment..."
     python -m venv .venv
 }
-# Install/upgrade deps if anthropic or uvicorn is missing
-$uvicornCheck = & ".venv\Scripts\python.exe" -c "import uvicorn, anthropic" 2>&1
+
+& ".venv\Scripts\python.exe" -c "import uvicorn, anthropic" 2>&1 | Out-Null
 if ($LASTEXITCODE -ne 0) {
     Log "Installing backend dependencies..."
     & ".venv\Scripts\pip.exe" install -r requirements.txt
@@ -73,9 +77,8 @@ $uvicornProc = Start-Process -FilePath "cmd.exe" `
     -ArgumentList "/c", ".venv\Scripts\uvicorn.exe app.main:app --host 0.0.0.0 --port 8000 >> `"$uvicornLog`" 2>&1" `
     -WorkingDirectory "$REPO\backend" `
     -PassThru -WindowStyle Hidden
-Log "FastAPI pid=$($uvicornProc.Id) — waiting for :8000..."
+Log "FastAPI pid=$($uvicornProc.Id) - waiting for :8000..."
 
-# Wait for healthz
 $backendReady = $false
 for ($i = 0; $i -lt 20; $i++) {
     try {
@@ -88,16 +91,16 @@ if ($backendReady) {
     $healthz = Invoke-RestMethod -Uri "http://localhost:8000/healthz"
     Log "  healthz: ok=$($healthz.ok) mongo=$($healthz.mongo) version=$($healthz.version)"
 } else {
-    Log "WARNING: Backend did not respond within 10s — check uvicorn.log"
+    Log "WARNING: Backend did not respond within 10s - check uvicorn.log"
 }
 
-# ── Dashboard (Next.js) ───────────────────────────────────────────────────────
+# --- Dashboard (Next.js) ---
 if (-not $NoDashboard) {
     Log "Starting dashboard on :3001..."
     Set-Location "$REPO\dashboard"
 
     if (-not (Test-Path ".env.local")) {
-        Log "No dashboard\.env.local found — copying from .env.example..."
+        Log "No dashboard\.env.local found - copying from .env.example..."
         Copy-Item ".env.example" ".env.local"
     }
     if (-not (Test-Path "node_modules")) {
@@ -110,11 +113,11 @@ if (-not $NoDashboard) {
         -ArgumentList "/c", "npm.cmd run dev -- --port 3001 >> `"$dashLog`" 2>&1" `
         -WorkingDirectory "$REPO\dashboard" `
         -PassThru -WindowStyle Hidden
-    Log "dashboard pid=$($dashProc.Id) — log: dashboard\next.log"
+    Log "dashboard pid=$($dashProc.Id) - log: dashboard\next.log"
 }
 
-# ── Summary ───────────────────────────────────────────────────────────────────
-Log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# --- Summary ---
+Log "========================================"
 Log "Services started:"
 Log "  FastAPI   -> http://localhost:8000  (http://100.76.124.67:8000)"
 if (-not $NoDashboard) {
