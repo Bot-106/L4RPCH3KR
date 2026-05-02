@@ -8,6 +8,9 @@ Thumbs.db
 *.swp
 *.swo
 
+# Claude Code worktree scratch space — never commit
+.claude/worktrees/
+
 # Env
 .env
 .env.local
