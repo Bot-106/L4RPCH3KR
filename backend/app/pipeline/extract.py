@@ -55,6 +55,7 @@ async def _extract_with_anthropic(text: str) -> list[dict]:
     key = _anthropic_key()
     model = settings.llm_model if "claude" in settings.llm_model else "claude-haiku-4-5"
     print(f"[EXTRACT] key_present={bool(key)} key_prefix={key[:12] if key else 'EMPTY'} model={model}")
+    print(f"[EXTRACT] transcript:\n{text}")
     if not key:
         raise ValueError("ANTHROPIC_API_KEY is empty")
     client = anthropic.AsyncAnthropic(api_key=key)
@@ -97,9 +98,16 @@ async def _extract_with_openai(text: str) -> list[dict]:
 
 def _keyword_fallback(text: str, utterance_id: str) -> dict | None:
     lower = text.lower()
+    normalized = re.sub(r"[^a-z0-9]+", " ", lower)
+    buzzwords = ["agentic", "b2b", "v2b", "saas", "sac", "yc", "y combinator", "vc", "venture capital", "stealth startup", "unicorn", "10x", "ai wrapper"]
+    for keyword in buzzwords:
+        if re.search(rf"\b{re.escape(keyword)}\b", normalized):
+            return _make_claim(utterance_id, text, "buzzword", keyword, "startup_buzzword", {"keyword": keyword}, "none", 0.90)
+
+    if any(phrase in lower for phrase in ["changed the world", "change the world", "most brilliant entrepreneur", "rounded up 50 billion", "5000 different companies", "5,000 different companies"]):
+        return _make_claim(utterance_id, text, "quantitative", "absurd_impact", "absurd_claim", {"metric": "impact", "amount": 1, "unit": "absurd_claim"}, "none", 0.92)
     
     # Check for quantitative claims first (numbers + units)
-    import re
     # Match patterns like "5 gold medals", "3 papers", "10 years"
     number_match = re.search(r'(\d+)\s+([a-z\s]+)', lower)
     if number_match:
@@ -154,10 +162,16 @@ def _make_claim(utterance_id: str, text: str, kind: str, subject: str, predicate
 
 
 async def extract_claim(text: str, utterance_id: str) -> dict | None:
+    claims = await extract_claims(text, utterance_id)
+    return claims[0] if claims else None
+
+
+async def extract_claims(text: str, utterance_id: str) -> list[dict]:
     if not text.strip():
-        return None
+        return []
     if settings.fixture_mode:
-        return _keyword_fallback(text, utterance_id)
+        fallback = _keyword_fallback(text, utterance_id)
+        return [fallback] if fallback else []
     try:
         # Auto-select provider based on which key is actually present
         if _anthropic_key():
@@ -165,19 +179,23 @@ async def extract_claim(text: str, utterance_id: str) -> dict | None:
         elif settings.openai_api_key:
             fn = _extract_with_openai
         else:
-            return _keyword_fallback(text, utterance_id)
+            fallback = _keyword_fallback(text, utterance_id)
+            return [fallback] if fallback else []
         claims = await asyncio.wait_for(fn(text), timeout=15.0)
         if claims:
-            c = claims[0]
-            return _make_claim(
-                utterance_id, text,
-                c.get("kind", "language_experience"),
-                str(c.get("subject", "")).lower().strip(),
-                c.get("predicate", ""),
-                c.get("value", {}),
-                c.get("hedge", "none"),
-                float(c.get("extraction_confidence", 0.85)),
-            )
+            return [
+                _make_claim(
+                    utterance_id, text,
+                    c.get("kind", "language_experience"),
+                    str(c.get("subject", "")).lower().strip(),
+                    c.get("predicate", ""),
+                    c.get("value", {}),
+                    c.get("hedge", "none"),
+                    float(c.get("extraction_confidence", 0.85)),
+                )
+                for c in claims[:5]
+            ]
     except Exception as exc:
         log.warning("extract: LLM failed (%s), falling back to keywords", exc)
-    return _keyword_fallback(text, utterance_id)
+    fallback = _keyword_fallback(text, utterance_id)
+    return [fallback] if fallback else []

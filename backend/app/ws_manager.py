@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import WebSocket
+from fastapi import WebSocket, WebSocketDisconnect
 
 
 def now_iso() -> str:
@@ -38,7 +38,7 @@ class WsManager:
         for ws in list(self.phones.get(session_id, set())):
             try:
                 await ws.send_text(message)
-            except RuntimeError:
+            except (RuntimeError, WebSocketDisconnect):
                 self.unsubscribe(ws)
 
     async def broadcast_global(self, event_type: str, data: dict[str, Any]) -> None:
@@ -46,7 +46,7 @@ class WsManager:
         for ws in list(self._global_phones):
             try:
                 await ws.send_text(message)
-            except RuntimeError:
+            except (RuntimeError, WebSocketDisconnect):
                 self.unsubscribe(ws)
 
     async def send_pi_haptic(self, severity: str) -> None:
@@ -55,7 +55,7 @@ class WsManager:
         for ws in list(self.pis):
             try:
                 await ws.send_text(message)
-            except RuntimeError:
+            except (RuntimeError, WebSocketDisconnect):
                 self.unsubscribe(ws)
 
 

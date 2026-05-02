@@ -16,9 +16,23 @@ from app.identity.conversation_resolver import RESOLVE_EVERY, resolve_from_conve
 from app.identity.name_extraction import resolve_by_name
 from app.pipeline.compare import compare_claim
 from app.pipeline.dot_jots import update_dot_jots
-from app.pipeline.extract import extract_claim
+from app.pipeline.extract import extract_claims
 from app.pipeline.score import compute_score, compute_score_ai, score_label
 from app.ws_manager import manager
+
+
+async def update_attendee_larp_score(db: AsyncIOMotorDatabase, subject_id: str, session_score: float) -> None:
+    attendee = await db.attendees.find_one({"id": subject_id})
+    if not attendee:
+        return
+    sessions = await db.sessions.find({"subject_id": subject_id}).to_list(None)
+    max_session_score = max([float(s.get("score", 0.0) or 0.0) for s in sessions] + [0.0, session_score])
+    profile_score = float(attendee.get("profile_larp_score", 0.0) or 0.0)
+    final_score = max(max_session_score, profile_score)
+    await db.attendees.update_one(
+        {"id": subject_id},
+        {"$set": {"larp_score": final_score, "larp_score_updated_at": datetime.utcnow()}},
+    )
 
 
 async def process_simulated_utterance(db: AsyncIOMotorDatabase, session_id: str, text: str, speaker: str = "partner", speaker_confidence: float | None = None, face_ratio: float = 1.0) -> None:
@@ -34,6 +48,8 @@ async def process_simulated_utterance(db: AsyncIOMotorDatabase, session_id: str,
         if event_id:
             # Fast path: pattern-match a spoken name (zero LLM cost)
             resolved = await resolve_by_name(db, event_id, text)
+            if resolved:
+                print(f"[RESOLVE] name_match subject_id={resolved}", flush=True)
             if not resolved:
                 # AI path: every RESOLVE_EVERY utterances, scan the full conversation
                 utterance_count = await db.utterances.count_documents({"session_id": session_id})
@@ -42,6 +58,8 @@ async def process_simulated_utterance(db: AsyncIOMotorDatabase, session_id: str,
                         {"session_id": session_id}
                     ).sort("started_at", 1).to_list(None)
                     resolved = await resolve_from_conversation(db, event_id, recent)
+                    if resolved:
+                        print(f"[RESOLVE] conversation_match subject_id={resolved}", flush=True)
         if resolved:
             await db.sessions.update_one({"id": session_id}, {"$set": {"subject_id": resolved, "partner_attendee_id": resolved}})
             session["subject_id"] = resolved
@@ -66,25 +84,53 @@ async def process_simulated_utterance(db: AsyncIOMotorDatabase, session_id: str,
     # Fire dot-jot synthesis as a background task — non-blocking for the main pipeline
     asyncio.ensure_future(update_dot_jots(db, session_id, text, speaker, session, face_ratio))
 
-    claim = await extract_claim(text, utterance["id"]) if speaker in {"partner", "subject"} else None
-    if not claim:
-        return
-    await db.claims.insert_one(claim)
-    await manager.send_phone(session_id, "claim_detected", {"session_id": session_id, "claim": serializers.claim(claim)})
-
-    flag = await compare_claim(db, session, claim)
-    if flag:
-        await db.flags.insert_one(flag)
+    claims = await extract_claims(text, utterance["id"]) if speaker in {"partner", "subject"} else []
+    subject_id = session.get("subject_id") or session.get("partner_attendee_id")
+    if not claims:
         all_flags = await db.flags.find({"session_id": session_id}).to_list(None)
         score = await compute_score_ai(db, session_id, all_flags)
         await db.sessions.update_one({"id": session_id}, {"$set": {"score": score, "score_label": score_label(score)}})
-        if flag.get("subject_id"):
-            subject_flags = await db.flags.find({"subject_id": flag["subject_id"]}).to_list(None)
-            await db.attendees.update_one({"id": flag["subject_id"]}, {"$set": {"larp_score": compute_score(subject_flags)}})
-        await manager.send_phone(
-            session_id,
-            "flag_raised",
-            {"session_id": session_id, "flag": serializers.flag(flag), "claim": serializers.claim(claim), "utterance": serializers.utterance(utterance)},
-        )
+        if subject_id:
+            await update_attendee_larp_score(db, subject_id, score)
+            print(f"[SCORE] attendee_larp_score updated subject_id={subject_id} session_score={score:.3f}", flush=True)
+        else:
+            print("[SCORE] attendee_larp_score not updated (no subject_id)", flush=True)
         await manager.send_phone(session_id, "score_update", {"session_id": session_id, "score": score, "label": score_label(score)})
-        await manager.send_pi_haptic(flag["severity"])
+        print(f"[SCORE] session_score updated session_id={session_id} score={score:.3f}", flush=True)
+        return
+    for claim in claims:
+        await db.claims.insert_one(claim)
+        await manager.send_phone(session_id, "claim_detected", {"session_id": session_id, "claim": serializers.claim(claim)})
+
+        flag = await compare_claim(db, session, claim)
+        if flag:
+            await db.flags.insert_one(flag)
+            all_flags = await db.flags.find({"session_id": session_id}).to_list(None)
+            score = await compute_score_ai(db, session_id, all_flags)
+            await db.sessions.update_one({"id": session_id}, {"$set": {"score": score, "score_label": score_label(score)}})
+            subject_id = flag.get("subject_id") or session.get("subject_id") or session.get("partner_attendee_id")
+            if subject_id:
+                await update_attendee_larp_score(db, subject_id, score)
+                # clear profile cache when a flag is raised? It's fine to just clear cache so it pulls the latest next time
+                await db.attendees.update_one({"id": subject_id}, {"$set": {"profile_summary": None, "profile_summary_cached_at": None}})
+                print(f"[SCORE] attendee_larp_score updated subject_id={subject_id} session_score={score:.3f}", flush=True)
+            else:
+                print("[SCORE] attendee_larp_score not updated (no subject_id)", flush=True)
+            await manager.send_phone(
+                session_id,
+                "flag_raised",
+                {"session_id": session_id, "flag": serializers.flag(flag), "claim": serializers.claim(claim), "utterance": serializers.utterance(utterance)},
+            )
+            await manager.send_phone(session_id, "score_update", {"session_id": session_id, "score": score, "label": score_label(score)})
+            await manager.send_pi_haptic(flag["severity"])
+
+    all_flags = await db.flags.find({"session_id": session_id}).to_list(None)
+    score = await compute_score_ai(db, session_id, all_flags)
+    await db.sessions.update_one({"id": session_id}, {"$set": {"score": score, "score_label": score_label(score)}})
+    if subject_id:
+        await update_attendee_larp_score(db, subject_id, score)
+        print(f"[SCORE] attendee_larp_score updated subject_id={subject_id} session_score={score:.3f}", flush=True)
+    else:
+        print("[SCORE] attendee_larp_score not updated (no subject_id)", flush=True)
+    await manager.send_phone(session_id, "score_update", {"session_id": session_id, "score": score, "label": score_label(score)})
+    print(f"[SCORE] session_score updated session_id={session_id} score={score:.3f}", flush=True)

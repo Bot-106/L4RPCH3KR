@@ -1,4 +1,5 @@
 import logging
+import re
 from datetime import datetime
 
 import httpx
@@ -15,7 +16,49 @@ _SEVERITY = {
     "project": ("low", 0.20),
     "credential": ("high", 0.50),
     "quantitative": ("low", 0.20),
+    "buzzword": ("medium", 0.25),
 }
+
+_LARP_KEYWORDS = {
+    "agentic", "b2b", "v2b", "saas", "sac", "yc", "y combinator", "vc", "venture capital",
+    "stealth startup", "unicorn", "10x", "ai wrapper",
+}
+
+
+def _text_has_larp_keyword(text: str) -> str | None:
+    lower = re.sub(r"[^a-z0-9]+", " ", text.lower())
+    for keyword in _LARP_KEYWORDS:
+        if keyword in lower:
+            return keyword
+    return None
+
+
+def _absurd_quantitative_reason(claim: dict) -> str | None:
+    value = claim.get("value") or {}
+    metric = str(value.get("metric") or claim.get("subject") or "claim").lower()
+    amount = value.get("amount")
+    text = str(claim.get("text_span") or claim.get("text") or "")
+    lower = text.lower()
+    if any(phrase in lower for phrase in ["changed the world", "change the world", "most brilliant entrepreneur", "rounded up 50 billion"]):
+        return "Made an obviously inflated impact claim that should be treated as larping unless externally verified."
+    if not isinstance(amount, int | float):
+        return None
+    if amount >= 1_000_000 and any(word in metric for word in ["people", "users", "customers", "impact"]):
+        return f"Claimed {amount:g} {metric}, which is an extraordinary scale claim with no live verification."
+    if amount >= 100 and any(word in metric for word in ["products", "companies", "startups", "projects"]):
+        return f"Claimed {amount:g} {metric}, which is an unusually inflated builder claim with no live verification."
+    return None
+
+
+def _absurd_employment_reason(claim: dict) -> str | None:
+    value = claim.get("value") or {}
+    text = str(claim.get("text_span") or claim.get("text") or "")
+    haystack = f"{text} {value.get('company') or ''} {claim.get('subject') or ''}".lower()
+    if re.search(r"\b5,?000\b.*\b(companies|internships|interning|interned)\b", haystack) or re.search(r"\b(companies|internships|interning|interned)\b.*\b5,?000\b", haystack):
+        return "Claimed internship/employment across 5,000 companies, which is structurally impossible for a normal profile."
+    if re.search(r"\b\d{3,}\b.*\b(companies|internships)\b", haystack):
+        return "Claimed an unusually large number of companies/internships with no live verification."
+    return None
 
 
 async def _fetch_github_languages(github_login: str) -> set[str]:
@@ -81,6 +124,50 @@ async def compare_claim(db: AsyncIOMotorDatabase, session: dict, claim: dict) ->
     profile = await _get_or_build_profile(db, attendee)
     facts = profile.get("facts") or {}
     severity, score_delta = _SEVERITY.get(kind, ("low", 0.20))
+    claim_text = claim.get("text_span") or claim.get("text") or ""
+
+    keyword = _text_has_larp_keyword(str(claim_text))
+    if kind == "buzzword":
+        keyword = str((claim.get("value") or {}).get("keyword") or keyword or subject)
+        verified_text = f"Startup buzzword detected: '{keyword}'. Needs concrete proof before counting as a real credential."
+        severity = "medium"
+        score_delta = 0.25
+
+    elif kind != "employment" and keyword:
+        verified_text = f"Startup buzzword detected: '{keyword}'. Needs concrete proof before counting as a real credential."
+        severity = "medium"
+        score_delta = 0.25
+
+    elif kind == "quantitative":
+        absurd_reason = _absurd_quantitative_reason(claim)
+        if absurd_reason:
+            verified_text = absurd_reason
+            severity = "high"
+            score_delta = 0.45
+        else:
+            verified_text = None
+    else:
+        verified_text = None
+
+    if verified_text:
+        return {
+            "id": serializers.new_id(),
+            "claim_id": claim["id"],
+            "session_id": session["id"],
+            "subject_id": subject_id,
+            "profile_id": profile["id"],
+            "verified_against": "live.absurdity_heuristics",
+            "severity": severity,
+            "score_delta": score_delta,
+            "claim_type": kind,
+            "claim_text": claim_text,
+            "verified_text": verified_text,
+            "confidence": 0.9,
+            "created_at": datetime.utcnow(),
+            "disputed": False,
+            "dispute_status": "none",
+            "dispute_reason": None,
+        }
 
     if kind == "language_experience":
         known = {item.get("name", "").lower() for item in facts.get("languages", [])}
@@ -91,12 +178,24 @@ async def compare_claim(db: AsyncIOMotorDatabase, session: dict, claim: dict) ->
         verified_text = f"GitHub/profile facts show no {subject.capitalize()} in verified profile (known: {', '.join(sorted(known))})."
 
     elif kind == "employment":
+        absurd_reason = _absurd_employment_reason(claim)
+        if absurd_reason:
+            verified_text = absurd_reason
+            severity = "high"
+            score_delta = 0.45
+        else:
+            verified_text = None
         known = {(item.get("company") or "").lower() for item in facts.get("employment", [])}
-        if not known:
+        if verified_text:
+            pass
+        elif not known:
+            if claim.get("extraction_confidence", 0) < 0.60:
+                return None
+            verified_text = f"Claimed employment or internship at {subject}, but no verified employment data supports it."
+        elif subject in known:
             return None
-        if subject in known:
-            return None
-        verified_text = f"No record of employment at {subject} in verified profile."
+        else:
+            verified_text = f"No record of employment at {subject} in verified profile."
 
     elif kind == "education":
         known = {(item.get("school") or "").lower() for item in facts.get("education", [])}
@@ -157,6 +256,8 @@ async def compare_claim(db: AsyncIOMotorDatabase, session: dict, claim: dict) ->
         "verified_against": f"profile.{kind}",
         "severity": severity,
         "score_delta": score_delta,
+        "claim_type": kind,
+        "claim_text": claim_text,
         "verified_text": verified_text,
         "confidence": 0.85,
         "created_at": datetime.utcnow(),

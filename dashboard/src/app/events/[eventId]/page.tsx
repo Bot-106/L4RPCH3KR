@@ -148,12 +148,13 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
     }
   }
 
-  async function openSummary(attendee: Attendee) {
+  async function openSummary(attendee: Attendee, refresh = false) {
     setSelectedAttendee(attendee);
-    setSummary(null);
+    if (refresh) setStatus(`Refreshing ${attendee.full_name}'s profile...`);
+    if (!refresh) setSummary(null);
     setSummaryLoading(true);
     try {
-      const res = await api.attendeeSummary(eventId, attendee.id);
+      const res = await api.attendeeSummary(eventId, attendee.id, refresh);
       // ── DEBUG: log everything the backend returned ──────────────────────────
       console.group(`[LARPCHEKR] Profile summary for ${attendee.full_name}`);
       console.log("Full response:", res);
@@ -166,6 +167,7 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
       setSummary(res);
       setSelectedAttendee(res.attendee);
       setAttendees((rows) => rows.map((row) => (row.id === attendee.id ? res.attendee : row)));
+      setStatus(res.cached ? `Loaded cached profile for ${attendee.full_name}.` : `Refreshed profile for ${attendee.full_name}.`);
     } catch (err) {
       console.error("[LARPCHEKR] summary fetch failed:", err);
       setSummary(null);
@@ -466,32 +468,32 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
                   <div>
                     <h3 className="mb-2 text-xs font-bold uppercase tracking-widest text-stone-500">LinkedIn</h3>
                     {summary.linkedin.scraped ? (
-                      <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4 space-y-3">
-                        <div className="flex items-center gap-3">
+                      <div className="arcade-panel border-2 border-black bg-white p-4 space-y-4 shadow-[6px_6px_0_#b9b9b9]">
+                        <div className="flex items-start gap-3 border-b-2 border-black pb-3">
                           {(summary.linkedin.photoUrl ?? summary.linkedin.image) && (
-                            <img className="h-14 w-14 rounded-full object-cover ring-2 ring-white shrink-0" src={summary.linkedin.photoUrl ?? summary.linkedin.image ?? ""} alt="LinkedIn" />
+                            <img className="h-14 w-14 border-2 border-black object-cover shrink-0" src={summary.linkedin.photoUrl ?? summary.linkedin.image ?? ""} alt="LinkedIn" />
                           )}
-                          <div>
-                            <p className="font-bold text-blue-900">{summary.linkedin.name ?? selectedAttendee.full_name}</p>
-                            {summary.linkedin.headline && <p className="text-sm text-blue-800">{summary.linkedin.headline}</p>}
-                            {summary.linkedin.location && <p className="text-xs text-blue-600">📍 {summary.linkedin.location}</p>}
+                          <div className="min-w-0 flex-1">
+                            <p className="font-black text-black">{summary.linkedin.name ?? selectedAttendee.full_name}</p>
+                            {summary.linkedin.headline && <p className="mt-1 text-sm text-stone-700">{summary.linkedin.headline}</p>}
+                            {summary.linkedin.location && <p className="mt-1 text-xs text-stone-600">{summary.linkedin.location}</p>}
                           </div>
                         </div>
                         {summary.linkedin.about && (
                           <div>
-                            <p className="mb-1 text-xs font-bold text-blue-700">About</p>
-                            <p className="text-sm text-blue-900 line-clamp-4">{summary.linkedin.about}</p>
+                            <p className="mb-1 text-xs font-black uppercase text-stone-600">About</p>
+                            <p className="border-l-4 border-black bg-stone-100 px-3 py-2 text-sm text-stone-900 line-clamp-5">{summary.linkedin.about}</p>
                           </div>
                         )}
                         {summary.linkedin.experiences && summary.linkedin.experiences.length > 0 && (
                           <div>
-                            <p className="mb-1.5 text-xs font-bold text-blue-700">Experience</p>
+                            <p className="mb-1.5 text-xs font-black uppercase text-stone-600">Experience</p>
                             <div className="space-y-1.5">
                               {summary.linkedin.experiences.map((exp, i) => (
-                                <div key={i} className="rounded-lg bg-white/60 px-3 py-2 text-sm">
-                                  <p className="font-semibold text-blue-900">{exp.title}</p>
-                                  {exp.company && <p className="text-blue-700">{exp.company}</p>}
-                                  {exp.dates && <p className="text-xs text-blue-500">{exp.dates}</p>}
+                                <div key={i} className="border-2 border-black bg-stone-50 px-3 py-2 text-sm shadow-[3px_3px_0_#d4d4d4]">
+                                  <p className="font-bold text-black">{exp.title || "Experience"}</p>
+                                  {exp.company && <p className="text-stone-700">{exp.company}</p>}
+                                  {exp.dates && <p className="text-xs text-stone-500">{exp.dates}</p>}
                                 </div>
                               ))}
                             </div>
@@ -499,12 +501,12 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
                         )}
                         {summary.linkedin.education && summary.linkedin.education.length > 0 && (
                           <div>
-                            <p className="mb-1.5 text-xs font-bold text-blue-700">Education</p>
+                            <p className="mb-1.5 text-xs font-black uppercase text-stone-600">Education</p>
                             <div className="space-y-1">
                               {summary.linkedin.education.map((edu, i) => (
-                                <div key={i} className="rounded-lg bg-white/60 px-3 py-2 text-sm">
-                                  <p className="font-semibold text-blue-900">{edu.school}</p>
-                                  {edu.degree && <p className="text-blue-700">{edu.degree}</p>}
+                                <div key={i} className="border-2 border-black bg-stone-50 px-3 py-2 text-sm shadow-[3px_3px_0_#d4d4d4]">
+                                  <p className="font-bold text-black">{edu.school || "Education"}</p>
+                                  {edu.degree && <p className="text-stone-700">{edu.degree}</p>}
                                 </div>
                               ))}
                             </div>
@@ -512,10 +514,10 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
                         )}
                         {summary.linkedin.skills && summary.linkedin.skills.length > 0 && (
                           <div>
-                            <p className="mb-1.5 text-xs font-bold text-blue-700">Skills</p>
+                            <p className="mb-1.5 text-xs font-black uppercase text-stone-600">Skills</p>
                             <div className="flex flex-wrap gap-1.5">
                               {summary.linkedin.skills.map((s) => (
-                                <span key={s} className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-800">{s}</span>
+                                <span key={s} className="border-2 border-black bg-stone-100 px-2.5 py-1 text-xs font-bold text-black">{s}</span>
                               ))}
                             </div>
                           </div>
@@ -539,17 +541,17 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
                 {summary.github.login ? (
                   <div>
                     <h3 className="mb-2 text-xs font-bold uppercase tracking-widest text-stone-500">GitHub</h3>
-                    <div className="rounded-2xl border border-stone-200 bg-white p-4">
-                      <div className="flex items-start justify-between gap-2">
+                    <div className="arcade-panel border-2 border-black bg-white p-4 shadow-[6px_6px_0_#b9b9b9]">
+                      <div className="flex items-start justify-between gap-3 border-b-2 border-black pb-3">
                         <div>
-                          <p className="font-bold">{summary.github.name ?? summary.github.login}</p>
-                          {summary.github.bio && <p className="mt-1 text-sm text-stone-600">{summary.github.bio}</p>}
-                          {summary.github.company && <p className="mt-1 text-sm text-stone-500">🏢 {summary.github.company}</p>}
-                          {summary.github.location && <p className="text-sm text-stone-500">📍 {summary.github.location}</p>}
+                          <p className="font-black text-black">{summary.github.name ?? summary.github.login}</p>
+                          {summary.github.bio && <p className="mt-1 text-sm text-stone-700">{summary.github.bio}</p>}
+                          {summary.github.company && <p className="mt-1 text-sm text-stone-600">{summary.github.company}</p>}
+                          {summary.github.location && <p className="text-sm text-stone-600">{summary.github.location}</p>}
                         </div>
                         <div className="flex shrink-0 flex-col items-end gap-1 text-sm">
-                          <span className="font-bold">{summary.github.public_repos ?? 0} repos</span>
-                          <span className="text-stone-500">{summary.github.followers ?? 0} followers</span>
+                          <span className="font-black text-black">{summary.github.public_repos ?? 0} repos</span>
+                          <span className="text-stone-600">{summary.github.followers ?? 0} followers</span>
                         </div>
                       </div>
 
@@ -558,7 +560,22 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
                           <p className="mb-1.5 text-xs font-bold text-stone-500">Top languages</p>
                           <div className="flex flex-wrap gap-1.5">
                             {summary.github.top_languages.map((lang) => (
-                              <span key={lang} className="rounded-full bg-stone-100 px-2.5 py-1 text-xs font-bold text-stone-700">{lang}</span>
+                              <span key={lang} className="border-2 border-black bg-stone-100 px-2.5 py-1 text-xs font-bold text-black">{lang}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {summary.github.orgs && summary.github.orgs.length > 0 && (
+                        <div className="mt-3">
+                          <p className="mb-1.5 text-xs font-bold text-stone-500">Public orgs</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {summary.github.orgs.map((org) => (
+                              org.url ? (
+                                <a key={org.login ?? org.url} href={org.url} target="_blank" rel="noreferrer" className="plain-link border-2 border-black bg-white px-2.5 py-1 text-xs font-bold text-black shadow-[2px_2px_0_#d4d4d4] hover:bg-stone-50">{org.login}</a>
+                              ) : (
+                                <span key={org.login ?? "org"} className="border-2 border-black bg-white px-2.5 py-1 text-xs font-bold text-black">{org.login}</span>
+                              )
                             ))}
                           </div>
                         </div>
@@ -569,9 +586,23 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
                           <p className="mb-1.5 text-xs font-bold text-stone-500">Recent repos</p>
                           <div className="space-y-1.5">
                             {summary.github.recent_repos.map((repo) => (
-                              <a key={repo.name} href={repo.url} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-lg border border-stone-100 px-3 py-2 text-sm hover:bg-stone-50">
-                                <span className="font-medium text-stone-800">{repo.name}</span>
-                                <span className="text-stone-400">⭐ {repo.stars}</span>
+                              <a key={repo.name} href={repo.url} target="_blank" rel="noreferrer" className="plain-link flex items-center justify-between gap-3 border-2 border-black bg-stone-50 px-3 py-2 text-sm text-black shadow-[3px_3px_0_#d4d4d4] hover:bg-white">
+                                <span className="min-w-0 truncate font-bold text-black">{repo.name}</span>
+                                <span className="shrink-0 font-bold text-stone-700">stars {repo.stars}</span>
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {summary.github.shared_repos && summary.github.shared_repos.length > 0 && (
+                        <div className="mt-3">
+                          <p className="mb-1.5 text-xs font-bold text-stone-500">Shared / org repos</p>
+                          <div className="space-y-1.5">
+                            {summary.github.shared_repos.map((repo) => (
+                              <a key={repo.full_name ?? repo.name} href={repo.url} target="_blank" rel="noreferrer" className="plain-link flex items-center justify-between gap-3 border-2 border-black bg-stone-50 px-3 py-2 text-sm text-black shadow-[3px_3px_0_#d4d4d4] hover:bg-white">
+                                <span className="min-w-0 truncate font-bold text-black">{repo.full_name ?? repo.name}</span>
+                                <span className="shrink-0 font-bold text-stone-700">stars {repo.stars}</span>
                               </a>
                             ))}
                           </div>
@@ -628,6 +659,21 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
                     <p className="mt-2 text-sm">No profile data found. Add a GitHub login or LinkedIn URL to enrich this attendee.</p>
                   </div>
                 )}
+
+                <div className="border-t-2 border-black pt-4">
+                  <div className="mb-2 text-xs text-stone-600">
+                    {summary.cached ? "Loaded from cached profile summary." : "Fresh profile summary saved to database."}
+                    {summary.profile_summary_cached_at ? ` Cached at ${new Date(summary.profile_summary_cached_at).toLocaleString()}.` : ""}
+                  </div>
+                  <button
+                    type="button"
+                    className="px-4 py-2 text-xs font-bold"
+                    disabled={summaryLoading || !selectedAttendee}
+                    onClick={() => selectedAttendee ? void openSummary(selectedAttendee, true) : undefined}
+                  >
+                    {summaryLoading ? "Refreshing..." : "Refresh profile check"}
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="p-6 text-center text-sm text-stone-400">Failed to load profile data.</div>

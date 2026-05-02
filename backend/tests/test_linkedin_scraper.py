@@ -47,3 +47,53 @@ def test_normalize_mcp_profile_keeps_raw_text_for_haiku() -> None:
     assert normalized["name"] == "Pat Python"
     assert normalized["headline"] == "Backend Engineer | Python"
     assert normalized["_raw_text"] == "Pat Python\nBackend Engineer | Python"
+
+
+def test_normalize_preserves_structured_linkedin_json_sections() -> None:
+    normalized = _normalize(
+        {
+            "fullName": "Pat Python",
+            "headline": "Backend Engineer",
+            "profile": {
+                "experiences": [
+                    {
+                        "jobTitle": "Lead Backend Engineer",
+                        "companyName": "Acme Corp",
+                        "dateRange": "2022 - Present",
+                    }
+                ],
+                "education": [
+                    {
+                        "schoolName": "Example University",
+                        "degreeName": "BS Computer Science",
+                    }
+                ],
+                "skills": [{"name": "Python"}, {"name": "FastAPI"}],
+            },
+        },
+        "https://www.linkedin.com/in/patpython",
+    )
+
+    assert normalized["experiences"] == [
+        {"title": "Lead Backend Engineer", "company": "Acme Corp", "dates": "2022 - Present"}
+    ]
+    assert normalized["education"] == [
+        {"school": "Example University", "degree": "BS Computer Science"}
+    ]
+    assert normalized["skills"] == ["Python", "FastAPI"]
+
+
+def test_normalize_merges_structured_sections_with_main_profile_text() -> None:
+    normalized = _normalize(
+        {
+            "sections": {"main_profile": "Pat Python\nBackend Engineer"},
+            "positions": [{"title": "Founder", "company": "Hack Co", "duration": "2024 - Present"}],
+            "skills": ["React", "MongoDB"],
+        },
+        "https://www.linkedin.com/in/patpython",
+    )
+
+    assert normalized["experiences"] == [
+        {"title": "Founder", "company": "Hack Co", "dates": "2024 - Present"}
+    ]
+    assert normalized["skills"] == ["React", "MongoDB"]

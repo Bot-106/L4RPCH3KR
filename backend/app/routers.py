@@ -57,6 +57,20 @@ def social_links(row: dict[str, Any]) -> dict[str, str | None]:
     }
 
 
+async def attendee_summary_dynamic_fields(db: AsyncIOMotorDatabase, attendee: dict, attendee_id: str) -> dict[str, Any]:
+    flags = await db.flags.find({"subject_id": attendee_id}).sort("created_at", -1).to_list(50)
+    profile = await db.profiles.find_one({"attendee_id": attendee_id})
+    verified_profile = (profile.get("facts") if profile else None) or attendee.get("verified_profile") or {}
+    recent_sessions = await db.sessions.find({"subject_id": attendee_id}, {"dot_jots": 1}).sort("started_at", -1).to_list(10)
+    dot_jots: list[str] = []
+    for session in reversed(recent_sessions):
+        dot_jots.extend(session.get("dot_jots") or [])
+    for statement in (attendee.get("real_statements") or []):
+        if statement not in dot_jots:
+            dot_jots.append(statement)
+    return {"flags": flags, "verified_profile": verified_profile, "dot_jots": dot_jots}
+
+
 async def require_event(db: AsyncIOMotorDatabase, event_id: str) -> dict:
     event = await db.events.find_one({"id": event_id})
     if event is None:
@@ -408,6 +422,9 @@ async def update_attendee(event_id: str, attendee_id: str, payload: dict, db: As
     if "linkedin_url" in update:
         socials["linkedin"] = update["linkedin_url"] or None
         update["socials"] = socials
+    if any(field in update for field in ("github_login", "linkedin_url", "socials")):
+        update["profile_summary"] = None
+        update["profile_summary_cached_at"] = None
     await db.attendees.update_one({"id": attendee_id, "event_id": event_id}, {"$set": update})
     attendee = await db.attendees.find_one({"id": attendee_id})
     return {"attendee": serializers.attendee(attendee)}
@@ -432,7 +449,6 @@ async def fetch_attendee_profile_photo(event_id: str, attendee_id: str, db: Asyn
         if li.get("photoUrl"):
             image_url = li["photoUrl"]
             source = "linkedin_mcp"
-            print(f"[PHOTO] got photoUrl from LinkedIn MCP: {image_url[:80]}")
 
     # 2. Fallback: GitHub avatar
     if not image_url:
@@ -447,9 +463,8 @@ async def fetch_attendee_profile_photo(event_id: str, attendee_id: str, db: Asyn
                     if resp.status_code == 200:
                         image_url = resp.json().get("avatar_url")
                         source = "github_avatar"
-                        print(f"[PHOTO] using GitHub avatar: {image_url}")
-            except Exception as exc:
-                print(f"[PHOTO] GitHub avatar fetch failed: {exc}")
+            except Exception:
+                pass
 
     if not image_url:
         raise HTTPException(status_code=404, detail={"error": {"code": "profile_photo_not_found", "message": "no profile photo could be resolved"}})
@@ -463,7 +478,7 @@ async def fetch_attendee_profile_photo(event_id: str, attendee_id: str, db: Asyn
 
 
 @router.get("/events/{event_id}/attendees/{attendee_id}/summary")
-async def attendee_summary(event_id: str, attendee_id: str, db: AsyncIOMotorDatabase = Depends(get_db), _: dict = Depends(current_user)) -> dict:
+async def attendee_summary(event_id: str, attendee_id: str, refresh: bool = False, db: AsyncIOMotorDatabase = Depends(get_db), _: dict = Depends(current_user)) -> dict:
     import httpx
     import json
     from dotenv import dotenv_values
@@ -474,10 +489,36 @@ async def attendee_summary(event_id: str, attendee_id: str, db: AsyncIOMotorData
     if attendee is None:
         raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "attendee not found"}})
 
+    dynamic = await attendee_summary_dynamic_fields(db, attendee, attendee_id)
+    cached_summary = attendee.get("profile_summary") or {}
+    if cached_summary and not refresh and cached_summary.get("larp_score") is not None:
+        profile_score = cached_summary.get("larp_score")
+        profile_label = cached_summary.get("profile_larp_label")
+        if not profile_label and isinstance(profile_score, int | float):
+            profile_label = score_label(profile_score)
+        return {
+            "attendee": serializers.attendee(attendee),
+            "github": cached_summary.get("github") or {},
+            "linkedin": cached_summary.get("linkedin") or {},
+            "comparison": cached_summary.get("comparison") or {},
+            "verified_profile": dynamic["verified_profile"],
+            "flags": [serializers.flag(f) for f in dynamic["flags"]],
+            "larp_score": profile_score,
+            "profile_larp_score": profile_score,
+            "profile_larp_label": profile_label,
+            "dot_jots": dynamic["dot_jots"],
+            "cached": True,
+            "profile_summary_cached_at": attendee.get("profile_summary_cached_at"),
+        }
+
     print(f"\n{'='*60}")
     print(f"[SUMMARY] attendee={attendee.get('full_name')} id={attendee_id}")
     print(f"[SUMMARY] github_login={attendee.get('github_login')} linkedin_url={attendee.get('linkedin_url')}")
     print(f"{'='*60}\n")
+
+    env_path = Path(__file__).resolve().parents[2] / ".env"
+    env_values = dotenv_values(env_path)
+    github_token = env_values.get("GITHUB_TOKEN") or env_values.get("GITHUB_PAT")
 
     # ── GitHub ─────────────────────────────────────────────────────────────────
     github_data: dict = {}
@@ -485,9 +526,12 @@ async def attendee_summary(event_id: str, attendee_id: str, db: AsyncIOMotorData
     if github_login:
         try:
             async with httpx.AsyncClient(timeout=8.0) as client:
+                github_headers = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
+                if github_token:
+                    github_headers["Authorization"] = f"Bearer {github_token}"
                 user_resp = await client.get(
                     f"https://api.github.com/users/{github_login}",
-                    headers={"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"},
+                    headers=github_headers,
                 )
                 print(f"[GITHUB] GET /users/{github_login} → {user_resp.status_code}")
                 if user_resp.status_code == 200:
@@ -505,23 +549,59 @@ async def attendee_summary(event_id: str, attendee_id: str, db: AsyncIOMotorData
                     }
                     print(f"[GITHUB] data={json.dumps({k:v for k,v in github_data.items() if k!='avatar_url'}, indent=2)}")
 
-                repos_resp = await client.get(
+                owned_repos_resp = await client.get(
                     f"https://api.github.com/users/{github_login}/repos",
                     params={"per_page": 100, "type": "owner", "sort": "pushed"},
-                    headers={"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"},
+                    headers=github_headers,
                 )
-                print(f"[GITHUB] GET /users/{github_login}/repos → {repos_resp.status_code}")
-                if repos_resp.status_code == 200:
-                    repos = repos_resp.json()
+                member_repos_resp = await client.get(
+                    f"https://api.github.com/users/{github_login}/repos",
+                    params={"per_page": 100, "type": "member", "sort": "pushed"},
+                    headers=github_headers,
+                )
+                orgs_resp = await client.get(
+                    f"https://api.github.com/users/{github_login}/orgs",
+                    params={"per_page": 100},
+                    headers=github_headers,
+                )
+                print(f"[GITHUB] GET owner repos → {owned_repos_resp.status_code}; member repos → {member_repos_resp.status_code}; orgs → {orgs_resp.status_code}")
+                if owned_repos_resp.status_code == 200:
+                    repos = owned_repos_resp.json()
+                    member_repos = member_repos_resp.json() if member_repos_resp.status_code == 200 else []
+                    orgs = orgs_resp.json() if orgs_resp.status_code == 200 else []
+                    org_repos: list[dict] = []
+                    for org in orgs[:5]:
+                        org_login = org.get("login")
+                        if not org_login:
+                            continue
+                        org_repos_resp = await client.get(
+                            f"https://api.github.com/orgs/{org_login}/repos",
+                            params={"per_page": 20, "type": "public", "sort": "pushed"},
+                            headers=github_headers,
+                        )
+                        if org_repos_resp.status_code == 200:
+                            org_repos.extend(org_repos_resp.json())
+
+                    all_shared_repos = member_repos + [r for r in org_repos if r.get("full_name") not in {repo.get("full_name") for repo in member_repos}]
+                    all_repos = repos + [r for r in all_shared_repos if r.get("full_name") not in {repo.get("full_name") for repo in repos}]
                     lang_counts: dict[str, int] = {}
-                    for r in repos:
+                    for r in all_repos:
                         if r.get("language"):
                             lang_counts[r["language"]] = lang_counts.get(r["language"], 0) + 1
                     github_data["top_languages"] = sorted(lang_counts, key=lambda k: -lang_counts[k])[:6]
                     github_data["recent_repos"] = [
-                        {"name": r["name"], "description": r.get("description"), "stars": r.get("stargazers_count", 0), "url": r.get("html_url")}
+                        {"name": r["name"], "full_name": r.get("full_name"), "description": r.get("description"), "stars": r.get("stargazers_count", 0), "url": r.get("html_url"), "owner": (r.get("owner") or {}).get("login"), "shared": False}
                         for r in repos[:5]
                     ]
+                    github_data["shared_repos"] = [
+                        {"name": r["name"], "full_name": r.get("full_name"), "description": r.get("description"), "stars": r.get("stargazers_count", 0), "url": r.get("html_url"), "owner": (r.get("owner") or {}).get("login"), "shared": True}
+                        for r in all_shared_repos[:8]
+                    ]
+                    github_data["orgs"] = [
+                        {"login": org.get("login"), "url": org.get("html_url") or f"https://github.com/{org.get('login')}", "avatar_url": org.get("avatar_url")}
+                        for org in orgs[:10]
+                    ]
+                    github_data["shared_repo_count"] = len(all_shared_repos)
                     print(f"[GITHUB] top_languages={github_data['top_languages']}")
                     print(f"[GITHUB] recent_repos={[r['name'] for r in github_data.get('recent_repos', [])]}")
         except Exception as exc:
@@ -544,16 +624,40 @@ async def attendee_summary(event_id: str, attendee_id: str, db: AsyncIOMotorData
         print("[LINKEDIN] no URL — skipping scrape")
 
     # ── Flags & verified profile ───────────────────────────────────────────────
-    flags = await db.flags.find({"subject_id": attendee_id}).sort("created_at", -1).to_list(50)
-    profile = await db.profiles.find_one({"attendee_id": attendee_id})
-    verified_profile = (profile.get("facts") if profile else None) or attendee.get("verified_profile") or {}
+    flags = dynamic["flags"]
+    verified_profile = dynamic["verified_profile"]
     print(f"[FLAGS] count={len(flags)}")
     print(f"[VERIFIED_PROFILE] keys={list(verified_profile.keys())}")
 
+    # ── MongoDB same-name matches ──────────────────────────────────────────────
+    name_matches: list[dict] = []
+    attendee_name = attendee.get("full_name") or ""
+    if attendee_name.strip():
+        try:
+            name_matches = await db.attendees.find(
+                {
+                    "event_id": event_id,
+                    "id": {"$ne": attendee_id},
+                    "full_name": {"$regex": f"^{re.escape(attendee_name)}$", "$options": "i"},
+                }
+            ).to_list(10)
+        except Exception as exc:
+            print(f"[NAME_MATCH] ERROR: {exc}")
+
+    name_match_summary = "\n".join(
+        [
+            f"- id={m.get('id')} name={m.get('full_name')} headline={m.get('headline') or ''} "
+            f"github={m.get('github_login') or (m.get('socials') or {}).get('github') or ''} "
+            f"linkedin={m.get('linkedin_url') or (m.get('socials') or {}).get('linkedin') or ''}"
+            for m in name_matches
+        ]
+    )
+    if name_match_summary:
+        print(f"[NAME_MATCH] found={len(name_matches)}")
+
     # ── Claude comparison ──────────────────────────────────────────────────────
     comparison: dict = {}
-    env_path = Path(__file__).resolve().parents[2] / ".env"
-    anthropic_key = dotenv_values(env_path).get("ANTHROPIC_API_KEY") or settings.anthropic_api_key
+    anthropic_key = env_values.get("ANTHROPIC_API_KEY") or settings.anthropic_api_key
     print(f"[CLAUDE] key_present={bool(anthropic_key)} linkedin_scraped={linkedin_data.get('scraped')} github_login={github_data.get('login')}")
 
     if anthropic_key and (linkedin_data.get("scraped") or github_data.get("login")):
@@ -576,7 +680,9 @@ async def attendee_summary(event_id: str, attendee_id: str, db: AsyncIOMotorData
 - Public repos: {github_data.get('public_repos', 0)}
 - Followers: {github_data.get('followers', 0)}
 - Top languages: {', '.join(github_data.get('top_languages', []))}
-- Recent repos: {json.dumps([r['name'] for r in github_data.get('recent_repos', [])])}"""
+- Recent repos: {json.dumps([r['full_name'] or r['name'] for r in github_data.get('recent_repos', [])])}
+- Public orgs: {json.dumps([org['login'] for org in github_data.get('orgs', []) if org.get('login')])}
+- Shared/member/org repos: {json.dumps([r['full_name'] or r['name'] for r in github_data.get('shared_repos', [])])}"""
             else:
                 gh_summary = "GitHub: not connected."
 
@@ -593,6 +699,9 @@ async def attendee_summary(event_id: str, attendee_id: str, db: AsyncIOMotorData
 === GITHUB DATA ===
 {gh_summary}
 
+=== MONGODB NAME MATCHES (same full_name in this event) ===
+{name_match_summary if name_match_summary else "(none)"}
+
 Tasks — respond ONLY with a single JSON object, no markdown fences:
 1. "extracted": Extract structured data from the LinkedIn text into:
    - "experiences": list of {{title, company, dates}} — look for job titles, org names, date ranges anywhere in the text
@@ -604,7 +713,8 @@ Tasks — respond ONLY with a single JSON object, no markdown fences:
 5. "credibility": one of CONSISTENT / MINOR_GAPS / SIGNIFICANT_GAPS
 6. "credibility_reason": 1-sentence reason.
 7. "larp_score": number from 0.0 to 1.0 where 0 means the profiles match and 1 means major professional claims look unsupported.
-8. "larp_score_reason": 1 sentence explaining that score."""
+8. "larp_score_reason": 1 sentence explaining that score.
+9. If name matches exist, factor in whether this attendee seems to be the same person or conflicting records (mention in discrepancies if conflicting)."""
 
             print(f"[CLAUDE] calling claude-haiku-4-5 for extraction + comparison...")
             resp = client_ai.messages.create(
@@ -646,27 +756,25 @@ Tasks — respond ONLY with a single JSON object, no markdown fences:
     else:
         profile_score, profile_label = calculate_profile_larp_score(comparison)
     
-    # Update the field the dashboard list and summary actually render.
+    cached_at = datetime.utcnow()
+    profile_summary = {
+        "github": github_data,
+        "linkedin": linkedin_data,
+        "comparison": comparison,
+        "larp_score": profile_score,
+        "profile_larp_score": profile_score,
+        "profile_larp_label": profile_label,
+    }
+
+    # Update the field the dashboard list and summary actually render, and cache
+    # expensive external profile data so opening rows doesn't burn API tokens.
     await db.attendees.update_one(
         {"id": attendee_id},
-        {"$set": {"larp_score": profile_score, "profile_larp_score": profile_score}}
+        {"$set": {"larp_score": profile_score, "profile_larp_score": profile_score, "profile_summary": profile_summary, "profile_summary_cached_at": cached_at}}
     )
     attendee = await db.attendees.find_one({"id": attendee_id, "event_id": event_id}) or attendee
     
     print(f"\n[SUMMARY DONE] github_keys={list(github_data.keys())} linkedin_scraped={linkedin_data.get('scraped')} comparison_keys={list(comparison.keys())} profile_larp_score={profile_score}\n")
-
-    # Collect dot-jots from the most recent sessions where this attendee was subject
-    recent_sessions = await db.sessions.find(
-        {"subject_id": attendee_id},
-        {"dot_jots": 1}
-    ).sort("started_at", -1).to_list(10)
-    dot_jots: list[str] = []
-    for s in reversed(recent_sessions):
-        dot_jots.extend(s.get("dot_jots") or [])
-    # Also include any direct real_statements on the attendee document
-    for stmt in (attendee.get("real_statements") or []):
-        if stmt not in dot_jots:
-            dot_jots.append(stmt)
 
     return {
         "attendee": serializers.attendee(attendee),
@@ -678,7 +786,9 @@ Tasks — respond ONLY with a single JSON object, no markdown fences:
         "larp_score": profile_score,
         "profile_larp_score": profile_score,
         "profile_larp_label": profile_label,
-        "dot_jots": dot_jots,
+        "dot_jots": dynamic["dot_jots"],
+        "cached": False,
+        "profile_summary_cached_at": cached_at,
     }
 
 

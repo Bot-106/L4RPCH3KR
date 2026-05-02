@@ -1,49 +1,55 @@
-# L4RPCH3KR — Web Phone App
+# web-phone/ - Attendee PWA
 
-The attendee-facing progressive web app for L4RPCH3KR. Runs in any mobile or desktop browser. Connects to the FastAPI backend over Tailscale.
+Attendee-facing progressive web app for L4RPCH3KR, built for the EurekaHacks 2026 demo. It runs in a mobile or desktop browser and connects to the FastAPI backend for onboarding, pairing, live flags, score updates, and recap.
 
-## Running locally
+## Scope
+
+- Magic-link sign-in callback flow.
+- GitHub connect step.
+- Voice calibration screen.
+- Pi pairing QR flow.
+- Partner QR show/scan flow.
+- Live session screen with connection state, larp score, and flag cards.
+- Recap screen with post-session flags.
+- Websocket client with reconnect/backoff behavior.
+
+## Running Locally
 
 ```bash
 cd web-phone
 npm install
+cp .env.example .env
 npm run dev
 ```
 
-Open `http://localhost:3000` (or your local IP for mobile testing).
+Open `http://localhost:3000` or your local network/Tailscale URL for mobile testing.
 
-## Tailscale configuration
+## Environment
 
-Copy `.env.example` to `.env` and set your Tailscale IP:
-
+```bash
+VITE_API_BASE=http://localhost:8000
+VITE_WS_BASE=ws://localhost:8000
 ```
-VITE_API_BASE=http://100.64.x.x:8000
-VITE_WS_BASE=ws://100.64.x.x:8000
-```
-
-Then access the app from your phone at `http://100.64.x.x:3000`.
 
 ## Screens
 
 | Route | Screen | Description |
 |-------|--------|-------------|
-| `/onboarding/signin` | SignInScreen | Enter email to receive a magic link |
-| `/auth/callback` | AuthCallbackScreen | Handles magic-link token, sets JWT, routes to next step |
-| `/onboarding/github` | GithubConnectScreen | Link GitHub account via OAuth |
-| `/onboarding/voice` | VoiceCalibrationScreen | Record 15s of audio for speaker diarization |
-| `/onboarding/pair` | PiPairScreen | QR code for the Raspberry Pi to scan and claim |
-| `/live` | LiveScreen | Real-time session view: status pill, larp score, flag cards |
-| `/pair/show` | ShowQrScreen | Display a QR code for your partner to scan |
-| `/pair/scan` | ScanQrScreen | Scan partner's QR via camera to link session |
-| `/recap/:sessionId` | RecapScreen | Post-session flag list with dispute flow |
+| `/onboarding/signin` | SignInScreen | Enter email for auth |
+| `/auth/callback` | AuthCallbackScreen | Persist token and route to onboarding |
+| `/onboarding/github` | GithubConnectScreen | Link GitHub account |
+| `/onboarding/voice` | VoiceCalibrationScreen | Record calibration audio |
+| `/onboarding/pair` | PiPairScreen | Show QR for Pi pairing |
+| `/live` | LiveScreen | Live status, score, and flag cards |
+| `/pair/show` | ShowQrScreen | Display partner pairing QR |
+| `/pair/scan` | ScanQrScreen | Scan partner QR |
+| `/recap/:sessionId` | RecapScreen | Post-session recap |
 
-## Architecture
+## Tech Stack
 
-- **Vite + React 18 + TypeScript** (strict mode)
-- **Zustand** for auth state (`authStore`) and session/WS state (`sessionStore`)
-- **TanStack Query v5** for the recap data fetch
-- **Framer Motion** for flag card slide-in animation
-- **jsQR** for camera-based QR decoding
-- **qrcode.react** for QR display
-- **Custom WSClient** (`src/lib/ws.ts`) with exponential backoff reconnect (1s→30s, ±20% jitter)
-- **Design tokens** from `design/tokens/tokens.example.json`, injected as CSS custom properties, consumed via Tailwind theme extension
+- Vite + React + TypeScript
+- Zustand for auth/session state
+- TanStack Query for recap fetches
+- Framer Motion for live flag animation
+- `jsQR` and `qrcode.react` for QR flows
+- Custom websocket client in `src/lib/ws.ts`

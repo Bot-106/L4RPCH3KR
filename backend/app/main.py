@@ -206,7 +206,7 @@ async def handle_pi_ws(ws: WebSocket, token: str | None = None) -> None:
                 image_b64 = data.get("image_b64", "")
                 width = data.get("width")
                 height = data.get("height")
-                log.info('{"event": "frame_snapshot", "width": %s, "height": %s, "image_size_bytes": %d, "session_id": "%s", "request_id": "%s"}',
+                log.debug('{"event": "frame_snapshot", "width": %s, "height": %s, "image_size_bytes": %d, "session_id": "%s", "request_id": "%s"}',
                     width, height, len(image_b64), session_id, request_id)
                 session = await database().sessions.find_one({"id": session_id})
                 event_id = data.get("event_id") or (session or {}).get("event_id")
@@ -218,19 +218,19 @@ async def handle_pi_ws(ws: WebSocket, token: str | None = None) -> None:
                         attendee = await database().attendees.find_one({"id": match.attendee_id})
                         await database().sessions.update_one({"id": session_id}, {"$set": {"subject_id": match.attendee_id, "partner_attendee_id": match.attendee_id}})
                         pi_payload = {"session_id": session_id, "attendee_id": match.attendee_id, "attendee": serializers.attendee(attendee) if attendee else None, "confidence": match.confidence, "method": match.method}
-                        log.info('{"event": "face_matched", "attendee_id": "%s", "confidence": %f, "session_id": "%s", "request_id": "%s"}',
+                        log.debug('{"event": "face_matched", "attendee_id": "%s", "confidence": %f, "session_id": "%s", "request_id": "%s"}',
                             match.attendee_id, match.confidence, session_id, request_id)
                         await manager.send_phone(session_id, "partner_identified", pi_payload)
                         # subject_resolved is a backend→pi event not in contracts — see REVIEW.md
                         await ws.send_json(envelope("subject_resolved", pi_payload, session_id))
                         identified = True
                     else:
-                        log.warning('{"event": "face_not_matched", "reason": "ambiguous_or_no_match", "session_id": "%s", "request_id": "%s"}', session_id, request_id)
+                        log.debug('{"event": "face_not_matched", "reason": "ambiguous_or_no_match", "session_id": "%s", "request_id": "%s"}', session_id, request_id)
                         pi_payload = {"session_id": session_id, "attendee_id": None, "attendee": None, "confidence": 0.0, "method": "profile_picture_similarity", "reason": "no_profile_picture_match"}
                         await manager.send_phone(session_id, "partner_identified", pi_payload)
                         await ws.send_json(envelope("subject_resolved", pi_payload, session_id))
                 elif event_id:
-                    log.info('{"event": "face_matching_refresh", "event_id": "%s", "session_id": "%s", "request_id": "%s"}', event_id, session_id, request_id)
+                    log.debug('{"event": "face_matching_refresh", "event_id": "%s", "session_id": "%s", "request_id": "%s"}', event_id, session_id, request_id)
                     await face_matcher.refresh(database(), event_id)
                     reason = "no_comparable_profile_pictures" if not face_matcher.attendee_ids else "no_face_detected_in_snapshot"
                     pi_payload = {"session_id": session_id, "attendee_id": None, "attendee": None, "confidence": 0.0, "method": "profile_picture_similarity", "reason": reason}
@@ -268,7 +268,10 @@ async def handle_pi_ws(ws: WebSocket, token: str | None = None) -> None:
                         session_id, event_id, request_id)
                 else:
                     event_id = existing_session.get("event_id")
-                await ws.send_json(envelope("session_ack", {"session_id": session_id}, session_id))
+                try:
+                    await ws.send_json(envelope("session_ack", {"session_id": session_id}, session_id))
+                except (WebSocketDisconnect, RuntimeError):
+                    break
                 await manager.send_phone(session_id, "session_status", {"session_id": session_id, "status": "active", "partner": None})
                 await manager.broadcast_global("session_available", {"session_id": session_id, "event_id": event_id})
             if event_type == "session_end":
@@ -279,10 +282,16 @@ async def handle_pi_ws(ws: WebSocket, token: str | None = None) -> None:
             if event_type == "buffer_drain_end":
                 log.info('{"event": "buffer_drain_end", "session_id": "%s", "request_id": "%s"}', session_id, request_id)
             if event_type in {"pi_hello", "audio_meta", "browser_transcript", "frame_snapshot", "heartbeat", "buffer_drain_start", "buffer_drain_end", "session_start", "session_end"}:
-                await ws.send_text(json.dumps(payload))
+                try:
+                    await ws.send_text(json.dumps(payload))
+                except (WebSocketDisconnect, RuntimeError):
+                    break
             else:
                 log.warning('{"event": "unsupported_event_type", "event_type": "%s", "session_id": "%s", "request_id": "%s"}', event_type, session_id, request_id)
-                await ws.send_json(envelope("error", {"code": "unsupported_event_type", "message": f"unsupported event type {event_type}"}, session_id))
+                try:
+                    await ws.send_json(envelope("error", {"code": "unsupported_event_type", "message": f"unsupported event type {event_type}"}, session_id))
+                except (WebSocketDisconnect, RuntimeError):
+                    break
     except WebSocketDisconnect:
         log.info('{"event": "ws_disconnect", "session_id": "%s", "request_id": "%s"}', session_id, request_id)
     except RuntimeError as exc:

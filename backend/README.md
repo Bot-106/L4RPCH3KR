@@ -1,184 +1,79 @@
-# backend/ — Server
+# backend/ - Server
 
-Owner: **Engineer B**.
-
-The brain. Everything that's not a UI or a piece of hardware lives here. Same engineer also owns [`dashboard/`](../dashboard/README.md).
+FastAPI backend for L4RPCH3KR, built for the EurekaHacks 2026 demo. It owns auth, event data, attendee data, Pi/phone websockets, transcript ingestion, claim extraction, profile comparison, flag creation, and larp scoring.
 
 ## Scope
 
-In:
-- HTTP REST API (see `contracts/rest-api.md`).
-- Two WS endpoints (`/ws/pi`, `/ws/phone`) per `contracts/websocket-events.md`.
-- ASR pipeline (faster-whisper).
-- Speaker diarization via ECAPA-TDNN embedding match.
-- Claim extraction (LLM, structured output).
-- Profile fetching + caching (GitHub, LinkedIn-via-CSV, resume parse).
-- Comparison engine (claim ↔ profile facts → flag or no flag).
-- Larp scoring.
-- Async background workers (CSV import enrichment, profile refresh, transcript finalize).
-- Magic-link email + GitHub OAuth.
-- MongoDB persistence and indexes.
-- In-process WS fan-out (one process is fine for v1).
+- REST API for organizers, attendees, events, imports, exports, profiles, flags, and the Larperboard.
+- Pi websocket endpoint for session events, transcript/frame payloads, haptic responses, and disconnect-safe cleanup.
+- Phone websocket endpoint for live flag and score updates.
+- MongoDB persistence for events, attendees, sessions, utterances, claims, flags, profile summaries, and scores.
+- LLM-backed claim extraction and profile comparison.
+- GitHub profile lookup plus LinkedIn/profile-context comparison support.
+- CSV import/export for organizer workflows.
+- Smoke tests for health, auth behavior, event flows, and core API paths.
 
-Out (v1):
-- Multi-region.
-- A separate ML serving tier (we run faster-whisper in-process; if that's too slow we'll containerize it).
-- Streaming partial transcripts (we wait for utterance-end).
-- Anti-abuse / rate limiting beyond per-user 60 rpm.
+## Tech Stack
 
-## Tech stack
+- Python 3.11
+- FastAPI + Uvicorn
+- MongoDB
+- Anthropic/OpenAI-compatible LLM calls for structured claim/profile analysis
+- PyGithub/httpx for external profile data
+- pytest + pytest-asyncio for tests
 
-- **Python 3.11**
-- **FastAPI** + **uvicorn** (`--workers 1` for v1, `--reload` in dev)
-- **MongoDB 7** for attendees, sessions, utterances, claims, flags, profile facts, and voice calibration docs
-- **faster-whisper** (CTranslate2) for ASR — `small.en` default, configurable
-- **speechbrain** ECAPA-TDNN for speaker embeddings
-- **Anthropic Python SDK** for claim extraction (or OpenAI; configurable per env)
-- **PyGithub** for GitHub profile fetch
-- **httpx** for any other outbound HTTP
-- In-process background tasks for v1 enrichment jobs
-- **pytest** + **pytest-asyncio** for tests
-- **ruff** for lint
+## Local Environment
 
-## File layout
+Copy `.env.example` to `.env` and configure the required values.
 
-```
-backend/
-├── README.md
-├── pyproject.toml
-├── requirements.txt
-├── .env.example
-├── app/
-│   ├── __init__.py
-│   ├── main.py                ← FastAPI app factory
-│   ├── config.py              ← pydantic settings
-│   ├── db.py                  ← MongoDB client + database dependency
-│   ├── deps.py                ← FastAPI dependencies (auth, db session)
-│   ├── auth/
-│   │   ├── jwt.py
-│   │   ├── magic_link.py
-│   │   └── github_oauth.py
-│   ├── routers/               ← FastAPI route modules
-│   │   ├── auth.py
-│   │   ├── users.py
-│   │   ├── pairings.py
-│   │   ├── sessions.py
-│   │   ├── flags.py
-│   │   └── organizer.py       ← /events/* endpoints
-│   ├── ws/
-│   │   ├── pi.py              ← /ws/pi handler
-│   │   ├── phone.py           ← /ws/phone handler
-│   │   └── pubsub.py          ← future external fan-out, not used in v1
-│   ├── pipeline/
-│   │   ├── asr.py             ← faster-whisper wrapper
-│   │   ├── diarize.py         ← ECAPA embedding match
-│   │   ├── extract.py         ← LLM claim extraction
-│   │   ├── compare.py         ← claim ↔ profile-facts → flag
-│   │   ├── score.py           ← larp score
-│   │   └── orchestrator.py    ← drives audio → flag for one session
-│   ├── profiles/
-│   │   ├── github.py
-│   │   ├── linkedin.py        ← parses CSV-supplied LinkedIn URLs (no scraping in v1)
-│   │   └── resume.py          ← PDF text extract + LLM normalize
-│   ├── workers/
-│   │   ├── enrich_csv.py
-│   │   └── refresh_profile.py
-│   ├── contracts/
-│   │   └── generated/         ← from /contracts (gitignored)
-│   └── scripts/
-│       ├── sim_pi.py          ← simulates a Pi for end-to-end dev
-│       └── seed_event.py      ← creates a fake Event + Attendees for demo
-└── tests/
-    ├── test_routers/
-    ├── test_pipeline/
-    └── conftest.py
-```
+| Var | Purpose |
+|-----|---------|
+| `MONGO_URL` | MongoDB connection string |
+| `MONGO_DB` | Database name |
+| `JWT_SECRET` | JWT signing secret |
+| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | LLM provider credentials |
+| `LLM_MODEL` | Model used for extraction/comparison |
+| `GITHUB_TOKEN` | Optional GitHub API token |
+| `LINKEDIN_COOKIE` | Optional LinkedIn/MCP scraper credential |
 
-## External interfaces
-
-### Consumes
-- MongoDB (local docker-compose, prod managed).
-- Anthropic / OpenAI API for claim extraction.
-- GitHub API (PAT or OAuth on behalf of user).
-- SMTP (resend.com or postmark for magic-link delivery).
-- Audio binary frames + JSON WS from Pi clients.
-- JSON WS from phone clients.
-
-### Exposes
-- REST API on `:8000` per `contracts/rest-api.md`.
-- WS endpoints on `:8000/ws/pi`, `:8000/ws/phone` per `contracts/websocket-events.md`.
-
-### Local environment
-Reads from `backend/.env`:
-
-| Var | Required | Example |
-|-----|----------|---------|
-| `MONGO_URL` | yes | `mongodb://localhost:27017` |
-| `MONGO_DB` | yes | `larpchekr` |
-| `JWT_SECRET` | yes | random 64 bytes |
-| `MAGIC_LINK_FROM` | yes | `noreply@larpchekr.app` |
-| `RESEND_API_KEY` | yes (prod) | |
-| `GITHUB_OAUTH_CLIENT_ID` / `GITHUB_OAUTH_CLIENT_SECRET` | yes | |
-| `LLM_PROVIDER` | yes | `anthropic` or `openai` |
-| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | one of, depending on provider | |
-| `LLM_MODEL` | yes | `claude-sonnet-4-6` or `gpt-4.1-mini` |
-| `WHISPER_MODEL` | yes | `small.en` |
-| `STORAGE_BACKEND` | yes | `local` (dev) or `s3` |
-| `S3_BUCKET` / `S3_REGION` | s3 only | |
-
-## Local setup
+## Running Locally
 
 ```bash
 cd backend
-python3.11 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-
-# infra
-docker compose -f ../infra/docker-compose.dev.yml up -d mongo
-
-# migrations + seed
-python -m app.scripts.init_db
-python -m app.scripts.seed_event
-
-# server
-uvicorn app.main:app --reload
-
-# in another shell, simulate a pi:
-python -m app.scripts.sim_pi --session-id <id-from-seed>
+python -m venv .venv
+.\.venv\Scripts\pip install -r requirements.txt
+.\.venv\Scripts\uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-## MVP checklist
+API server: `http://localhost:8000`
 
-- [ ] Mongo collections/indexes initialize cleanly.
-- [ ] `/healthz` green.
-- [ ] Magic-link auth issues a JWT.
-- [ ] GitHub OAuth links `github_login` to a user.
-- [ ] `POST /users/me/voice-calibration` stores an embedding.
-- [ ] `POST /pairings` + `POST /pairings/consume` create a Session.
-- [ ] `POST /pi/claim` issues a Pi token.
-- [ ] WS `/ws/pi` accepts `pi_hello`, audio frames, frame snapshots.
-- [ ] WS `/ws/phone` accepts `subscribe_session`, fans out events.
-- [ ] Pipeline: audio → ASR → diarize → utterance row written.
-- [ ] Pipeline: partner utterance → claim extraction → claim row.
-- [ ] Pipeline: claim → compare(profile facts) → flag row + WS `flag_raised` + WS `haptic_pulse`.
-- [ ] Larp score recomputed on each new flag, emitted via `score_update`.
-- [ ] `GET /sessions/:id/recap` returns a complete recap.
-- [ ] CSV import endpoint runs through `app.workers.enrich_csv`.
-- [ ] Latency p50 utterance-end → flag emit ≤ 4s on a laptop. (Profile per-stage and document.)
+Tailscale URL from other devices: `http://100.76.124.67:8000`
 
-## Non-goals
+If other Tailscale devices cannot reach the backend, allow inbound TCP `8000` in Windows Firewall. The server must bind to `0.0.0.0`; binding to the default `127.0.0.1` only works on this PC.
 
-- A separate model-serving microservice. (Will containerize ASR if it's the bottleneck.)
-- Per-flag voting / community moderation.
-- Push notifications.
-- Anything that requires a paid LinkedIn API tier.
+Health check: `GET /healthz`
 
-## Open questions
+## Testing
 
-- **LLM provider:** Claude Sonnet 4.6 or gpt-4.1-mini? Decide on day 0 based on credit. Keep the interface in `app/pipeline/extract.py` provider-agnostic so we can flip.
-- **Whisper model size:** `small.en` is fast but slightly lossy on hedges. Test `medium.en` if GPU available; fall back to `small.en` on CPU-only deploy.
-- **Diarization fallback:** if ECAPA misclassifies >20% of utterances in user testing, do we add a second mic on the Pi? Track this in week 1 testing — if true, the Pi needs a hardware change (out of v1).
-- **Flag persistence vs. session-end finalize:** are flags durable as soon as written, or do we let the user redact pre-recap? Default: durable, with `disputed` for soft-redaction.
-- **Profile refresh cadence:** GitHub profile changes between import and conversation. Refresh on first session use, max once per 24h, surface staleness in the flag's `verified_text`.
+```bash
+cd backend
+.\.venv\Scripts\python.exe -m pytest
+```
+
+## Main Interfaces
+
+- `GET /healthz`
+- `POST /auth/*`
+- `GET /events`
+- `POST /events`
+- `GET /events/{event_id}/attendees`
+- `POST /events/{event_id}/attendees`
+- `POST /events/{event_id}/import`
+- `GET /events/{event_id}/export`
+- `GET /events/{event_id}/flags`
+- `GET /events/{event_id}/leaderboard`
+- `GET /leaderboard`
+- `WS /ws/pi`
+- `WS /ws/phone`
+
+See [`../contracts/`](../contracts/README.md) for shared REST/websocket/data contracts.

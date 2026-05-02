@@ -1,22 +1,25 @@
 # infra/
 
-Deploy and local-dev infrastructure. No application code lives here.
+Local development and deployment notes for L4RPCH3KR.
 
 ## Files
 
-- `docker-compose.dev.yml` — MongoDB for local dev. The backend stores sessions, attendees, claims, flags, and profile facts here.
+- `docker-compose.dev.yml` - MongoDB for local development. The backend stores events, attendees, sessions, utterances, claims, flags, profile summaries, and scores here.
 
-## Production deploy (TBD)
+## Local Dev
 
-For the demo we'll likely deploy:
+Start MongoDB before running the backend:
 
-- Backend → Fly.io or Railway, single region, single instance.
-- Dashboard → Vercel (Next.js native target).
-- MongoDB → Atlas or Railway managed.
+```bash
+docker compose -f infra/docker-compose.dev.yml up -d mongo
+```
 
-Engineer B picks one stack and writes the deploy notes here on day 1. Don't bikeshed.
+Then run the backend, dashboard, and phone app from their own folders.
 
-## Open questions
+## Demo Deployment Shape
 
-- Do we need a separate worker process for enrichment jobs, or is in-process enough? In-process is fine for v1; split later if CSV imports starve the API.
-- TLS termination: Fly handles it. If self-hosted, Caddy in front.
+- Backend: single FastAPI instance.
+- Dashboard: Next.js deployment.
+- Database: managed MongoDB or local MongoDB for demo testing.
+
+The project was built for EurekaHacks 2026 in under 24 hours, so deployment notes should stay lightweight and demo-focused unless this becomes a production project.

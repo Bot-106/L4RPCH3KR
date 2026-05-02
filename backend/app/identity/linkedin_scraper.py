@@ -204,6 +204,102 @@ def _parse_profile_text(text: str) -> dict[str, Any]:
     return result
 
 
+def _first_present(raw: Any, keys: set[str]) -> Any:
+    if isinstance(raw, dict):
+        for key, value in raw.items():
+            normalized = re.sub(r"[^a-z0-9]", "", key.lower())
+            if normalized in keys and value not in (None, "", [], {}):
+                return value
+        for value in raw.values():
+            found = _first_present(value, keys)
+            if found not in (None, "", [], {}):
+                return found
+    elif isinstance(raw, list):
+        for item in raw:
+            found = _first_present(item, keys)
+            if found not in (None, "", [], {}):
+                return found
+    return None
+
+
+def _pick_field(item: dict[str, Any], *keys: str) -> str:
+    normalized_keys = {re.sub(r"[^a-z0-9]", "", key.lower()) for key in keys}
+    for key, value in item.items():
+        if re.sub(r"[^a-z0-9]", "", key.lower()) in normalized_keys and value not in (None, "", [], {}):
+            if isinstance(value, (dict, list)):
+                return json.dumps(value, default=str)
+            return str(value)
+    return ""
+
+
+def _normalize_experiences(value: Any) -> list[dict[str, str]]:
+    if isinstance(value, dict):
+        value = value.get("items") or value.get("elements") or value.get("data") or list(value.values())
+    if not isinstance(value, list):
+        return []
+
+    experiences: list[dict[str, str]] = []
+    for item in value:
+        if isinstance(item, str):
+            if item.strip():
+                experiences.append({"title": item.strip(), "company": "", "dates": ""})
+            continue
+        if not isinstance(item, dict):
+            continue
+
+        company = _pick_field(item, "company", "companyName", "organization", "organizationName", "employer")
+        title = _pick_field(item, "title", "position", "role", "jobTitle", "name")
+        dates = _pick_field(item, "dates", "dateRange", "duration", "timePeriod", "period")
+        if not dates:
+            start = _pick_field(item, "startDate", "startedOn", "from")
+            end = _pick_field(item, "endDate", "endedOn", "to") or ("Present" if item.get("current") else "")
+            dates = " - ".join(part for part in (start, end) if part)
+        if title or company:
+            experiences.append({"title": title, "company": company, "dates": dates})
+
+    return experiences[:12]
+
+
+def _normalize_education(value: Any) -> list[dict[str, str]]:
+    if isinstance(value, dict):
+        value = value.get("items") or value.get("elements") or value.get("data") or list(value.values())
+    if not isinstance(value, list):
+        return []
+
+    education: list[dict[str, str]] = []
+    for item in value:
+        if isinstance(item, str):
+            if item.strip():
+                education.append({"school": item.strip(), "degree": ""})
+            continue
+        if not isinstance(item, dict):
+            continue
+        school = _pick_field(item, "school", "schoolName", "institution", "university", "name")
+        degree = _pick_field(item, "degree", "degreeName", "field", "fieldOfStudy", "description")
+        if school or degree:
+            education.append({"school": school, "degree": degree})
+    return education[:8]
+
+
+def _normalize_skills(value: Any) -> list[str]:
+    if isinstance(value, dict):
+        value = value.get("items") or value.get("elements") or value.get("data") or list(value.values())
+    if not isinstance(value, list):
+        return []
+
+    skills: list[str] = []
+    for item in value:
+        if isinstance(item, str):
+            skill = item.strip()
+        elif isinstance(item, dict):
+            skill = _pick_field(item, "name", "skill", "title")
+        else:
+            skill = ""
+        if skill and skill not in skills:
+            skills.append(skill)
+    return skills[:30]
+
+
 def _normalize(raw: dict[str, Any], url: str) -> dict[str, Any]:
     if not raw:
         return {"scraped": False}
@@ -212,8 +308,15 @@ def _normalize(raw: dict[str, Any], url: str) -> dict[str, Any]:
     sections = raw.get("sections") or {}
     main_text = sections.get("main_profile") or ""
 
+    structured_experiences = _normalize_experiences(_first_present(raw, {"experiences", "experience", "positions", "position", "workexperience"}))
+    structured_education = _normalize_education(_first_present(raw, {"education", "educations"}))
+    structured_skills = _normalize_skills(_first_present(raw, {"skills", "skill", "topskills"}))
+
     if main_text:
         parsed = _parse_profile_text(main_text)
+        experiences = structured_experiences or parsed.get("experiences", [])
+        education = structured_education or parsed.get("education", [])
+        skills = structured_skills or parsed.get("skills", [])
         print(f"[LINKEDIN PARSED] {json.dumps({k: v for k, v in parsed.items() if k != 'about'}, indent=2, default=str)}")
         return {
             "scraped": bool(parsed.get("name")),
@@ -224,9 +327,9 @@ def _normalize(raw: dict[str, Any], url: str) -> dict[str, Any]:
             "location": parsed.get("location"),
             "followers": parsed.get("followers"),
             "photoUrl": None,
-            "experiences": parsed.get("experiences", []),
-            "education": parsed.get("education", []),
-            "skills": parsed.get("skills", []),
+            "experiences": experiences,
+            "education": education,
+            "skills": skills,
             # Pass full raw text so Claude can extract what regex missed
             "_raw_text": main_text,
         }
@@ -248,7 +351,7 @@ def _normalize(raw: dict[str, Any], url: str) -> dict[str, Any]:
         "location": pick("location", "geoLocation", "geo_location"),
         "followers": pick("followers", "followersCount", "followers_count"),
         "photoUrl": pick("photoUrl", "photo_url", "profilePicture"),
-        "experiences": [],
-        "education": [],
-        "skills": [],
+        "experiences": structured_experiences,
+        "education": structured_education,
+        "skills": structured_skills,
     }

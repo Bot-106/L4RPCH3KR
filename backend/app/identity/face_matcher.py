@@ -72,7 +72,7 @@ class FaceMatcher:
             vector = vector / max(float(np.linalg.norm(vector)), 1e-6)
             return vector.astype(np.float32).tolist()
         except Exception as exc:
-            log.warning("face: image embedding failed: %s", exc)
+            log.debug("face: image embedding failed: %s", exc)
             return None
 
     def embedding_from_base64(self, image_b64: str | None) -> list[float] | None:
@@ -83,7 +83,7 @@ class FaceMatcher:
                 image_b64 = image_b64.split(",", 1)[1]
             return self._embedding_from_image_bytes(base64.b64decode(image_b64))
         except Exception as exc:
-            log.warning("face: invalid base64 image: %s", exc)
+            log.debug("face: invalid base64 image: %s", exc)
             return None
 
     async def _embedding_from_url(self, url: str) -> list[float] | None:
@@ -93,11 +93,11 @@ class FaceMatcher:
             response.raise_for_status()
             content_type = response.headers.get("content-type", "")
             if "image" not in content_type and not url.lower().split("?")[0].endswith((".jpg", ".jpeg", ".png", ".webp")):
-                log.info("face: profile url is not a direct image: %s", url)
+                log.debug("face: profile url is not a direct image: %s", url)
                 return None
             return self._embedding_from_image_bytes(response.content)
         except Exception as exc:
-            log.warning("face: failed to fetch profile image %s: %s", url, exc)
+            log.debug("face: failed to fetch profile image %s: %s", url, exc)
             return None
 
     def _best_linkedin_image_from_html(self, body: str) -> str | None:

@@ -121,7 +121,10 @@ export type AttendeeSummary = {
     avatar_url?: string;
     html_url?: string;
     top_languages?: string[];
-    recent_repos?: { name: string; description?: string | null; stars: number; url: string }[];
+    recent_repos?: { name: string; full_name?: string | null; description?: string | null; stars: number; url: string; owner?: string | null; shared?: boolean }[];
+    shared_repos?: { name: string; full_name?: string | null; description?: string | null; stars: number; url: string; owner?: string | null; shared?: boolean }[];
+    shared_repo_count?: number;
+    orgs?: { login?: string | null; url?: string | null; avatar_url?: string | null }[];
   };
   linkedin: {
     scraped?: boolean;
@@ -156,6 +159,8 @@ export type AttendeeSummary = {
   profile_larp_score?: number | null;
   profile_larp_label?: string | null;
   dot_jots?: string[];
+  cached?: boolean;
+  profile_summary_cached_at?: string | null;
 };
 
 export type LeaderboardEntry = {
@@ -251,7 +256,7 @@ export const api = {
       body: JSON.stringify(data)
     }),
   fetchProfilePhoto: (eventId: string, attendeeId: string) => request<{ attendee: Attendee; profile_pic_url: string; source: string; has_embedding: boolean }>(`/events/${eventId}/attendees/${attendeeId}/profile-photo`, { method: "POST" }),
-  attendeeSummary: (eventId: string, attendeeId: string) => request<AttendeeSummary>(`/events/${eventId}/attendees/${attendeeId}/summary`),
+  attendeeSummary: (eventId: string, attendeeId: string, refresh = false) => request<AttendeeSummary>(`/events/${eventId}/attendees/${attendeeId}/summary${refresh ? "?refresh=true" : ""}`),
   deleteAttendee: (eventId: string, attendeeId: string) => request<{ attendee: Attendee }>(`/events/${eventId}/attendees/${attendeeId}`, { method: "DELETE" }),
   exportUrl: (eventId: string) => `${API_BASE}/events/${eventId}/export`
 };

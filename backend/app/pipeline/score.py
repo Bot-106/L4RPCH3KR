@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 
 log = logging.getLogger(__name__)
 
@@ -96,7 +97,7 @@ async def _call_score_llm(user_message: str) -> dict:
             messages=[{"role": "user", "content": user_message}],
         )
         raw = msg.content[0].text.strip() if msg.content else "{}"
-        return json.loads(raw)
+        return _parse_score_json(raw)
     elif settings.openai_api_key:
         from openai import AsyncOpenAI
         client = AsyncOpenAI(api_key=settings.openai_api_key)
@@ -109,9 +110,26 @@ async def _call_score_llm(user_message: str) -> dict:
             ],
             max_tokens=32,
         )
-        return json.loads(resp.choices[0].message.content.strip())
+        return _parse_score_json(resp.choices[0].message.content.strip())
     else:
         raise ValueError("No LLM API key configured")
+
+
+def _parse_score_json(raw: str) -> dict:
+    raw = raw.strip()
+    if raw.startswith("```"):
+        raw = re.sub(r"^```[a-zA-Z]*\n?", "", raw)
+        raw = re.sub(r"\n?```$", "", raw).strip()
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        match = re.search(r"\{.*\}", raw, re.DOTALL)
+        if match:
+            return json.loads(match.group())
+        number = re.search(r"(?:score|rating)?\D*(0(?:\.\d+)?|1(?:\.0+)?)", raw, re.IGNORECASE)
+        if number:
+            return {"score": float(number.group(1))}
+        raise
 
 
 def score_label(score: float) -> str:
