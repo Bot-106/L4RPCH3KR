@@ -36,6 +36,16 @@ Rules:
 """
 
 
+def _safe_json_loads(raw: str) -> dict:
+    if not raw:
+        return {"attendee_id": None}
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        log.warning("conversation_resolver: invalid JSON response: %s", raw)
+        return {"attendee_id": None}
+
+
 def _attendee_summary(attendee: dict) -> str:
     parts = []
     name = f"{attendee.get('firstname', '')} {attendee.get('lastname', '')}".strip()
@@ -113,8 +123,8 @@ async def _call_anthropic(api_key: str, user_message: str) -> dict:
         system=_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user_message}],
     )
-    raw = msg.content[0].text.strip() if msg.content else "{}"
-    return json.loads(raw)
+    raw = msg.content[0].text.strip() if msg.content else ""
+    return _safe_json_loads(raw)
 
 
 async def _call_openai(user_message: str) -> dict:
@@ -129,4 +139,5 @@ async def _call_openai(user_message: str) -> dict:
         ],
         max_tokens=64,
     )
-    return json.loads(resp.choices[0].message.content.strip())
+    raw = resp.choices[0].message.content.strip() if resp.choices and resp.choices[0].message.content else ""
+    return _safe_json_loads(raw)

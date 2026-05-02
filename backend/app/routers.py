@@ -283,7 +283,80 @@ async def list_attendees(event_id: str, limit: int = 50, cursor: str | None = No
     await require_event(db, event_id)
     limit = min(max(limit, 1), 200)
     rows = await db.attendees.find({"event_id": event_id, "deleted_at": None}).sort("full_name", 1).limit(limit).to_list(limit)
-    return {"attendees": [serializers.attendee(a) for a in rows], "next_cursor": None}
+    attendee_ids = [row["id"] for row in rows]
+    flags = await db.flags.find({"subject_id": {"$in": attendee_ids}}).to_list(None)
+    flag_counts: dict[str, int] = {}
+    for flag in flags:
+        subject_id = flag.get("subject_id")
+        if subject_id:
+            flag_counts[subject_id] = flag_counts.get(subject_id, 0) + 1
+    attendees = []
+    for row in rows:
+        attendee = serializers.attendee(row)
+        attendee["flag_count"] = flag_counts.get(row["id"], 0)
+        attendees.append(attendee)
+    return {"attendees": attendees, "next_cursor": None}
+
+
+@router.get("/events/{event_id}/leaderboard")
+async def event_leaderboard(event_id: str, db: AsyncIOMotorDatabase = Depends(get_db), _: dict = Depends(current_user)) -> dict:
+    await require_event(db, event_id)
+    return await build_leaderboard(db, event_id)
+
+
+async def build_leaderboard(db: AsyncIOMotorDatabase, event_id: str | None = None) -> dict:
+    query = {"deleted_at": None}
+    if event_id:
+        query["event_id"] = event_id
+    rows = await db.attendees.find(query).to_list(None)
+    attendee_ids = [row["id"] for row in rows]
+    flags = await db.flags.find({"subject_id": {"$in": attendee_ids}}).to_list(None)
+    flag_counts: dict[str, int] = {}
+    for flag in flags:
+        subject_id = flag.get("subject_id")
+        if subject_id:
+            flag_counts[subject_id] = flag_counts.get(subject_id, 0) + 1
+    ranked = sorted(
+        rows,
+        key=lambda row: (row.get("larp_score") or 0, flag_counts.get(row["id"], 0), row.get("full_name") or ""),
+        reverse=True,
+    )
+    return {
+        "leaderboard": [
+            {
+                "rank": index + 1,
+                "attendee": serializers.attendee(row),
+                "larp_score": row.get("larp_score") or 0,
+                "flag_count": flag_counts.get(row["id"], 0),
+            }
+            for index, row in enumerate(ranked)
+        ]
+    }
+
+
+@router.get("/leaderboard")
+async def global_leaderboard(event_id: str | None = None, db: AsyncIOMotorDatabase = Depends(get_db), _: dict = Depends(current_user)) -> dict:
+    if event_id:
+        await require_event(db, event_id)
+    return await build_leaderboard(db, event_id)
+
+
+@router.get("/events/{event_id}/flags")
+async def event_flags(event_id: str, db: AsyncIOMotorDatabase = Depends(get_db), _: dict = Depends(current_user)) -> dict:
+    await require_event(db, event_id)
+    attendees = await db.attendees.find({"event_id": event_id, "deleted_at": None}).to_list(None)
+    attendee_by_id = {attendee["id"]: attendee for attendee in attendees}
+    flags = await db.flags.find({"subject_id": {"$in": list(attendee_by_id)}}).sort("created_at", -1).to_list(None)
+    return {
+        "flags": [
+            {
+                **serializers.flag(flag),
+                "attendee": serializers.attendee(attendee_by_id[flag["subject_id"]]) if flag.get("subject_id") in attendee_by_id else None,
+                "attendee_name": (attendee_by_id.get(flag.get("subject_id")) or {}).get("full_name"),
+            }
+            for flag in flags
+        ]
+    }
 
 
 @router.get("/events/{event_id}/attendees/export")

@@ -288,11 +288,11 @@ export default function LaptopLivePage({ params }: { params: Promise<{ eventId: 
               <p className="text-xs font-black uppercase tracking-[0.25em]">Verdict</p>
               <p className="mt-3 text-4xl font-black">{scoreVerdict(score)}</p>
               <div className="mt-4 rounded-2xl bg-stone-950 p-4 text-white">
-                <p className="text-xs font-black uppercase tracking-[0.25em] text-lime-200">Larp probability</p>
-                <p className="mt-1 text-5xl font-black">{larpPercent(score)}%</p>
+                <p className="text-xs font-black uppercase tracking-[0.25em] text-lime-200">Larpometer™</p>
+                <p className="mt-1 text-5xl font-black">{larpPercent(score)}</p>
                 <p className="mt-1 text-sm font-bold text-lime-100">{larpAssessment(score, flags)}</p>
               </div>
-              <p className="mt-2 text-sm font-bold">Score {score == null ? "--" : score.toFixed(2)} · {scoreLabel} · {flags.length} flags</p>
+              <p className="mt-2 text-sm font-bold">Larpometer™ {score == null ? "--" : larpPercent(score)} · {scoreLabel} · {flags.length} flags</p>
             </div>
             <div className="rounded-[2rem] border border-stone-700 bg-stone-900 p-6">
               <p className="text-xs font-black uppercase tracking-[0.25em] text-stone-400">Capture</p>

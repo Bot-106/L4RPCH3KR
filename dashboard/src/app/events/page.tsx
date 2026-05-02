@@ -64,7 +64,7 @@ export default function EventsPage() {
         </div>
         <nav className="flex flex-wrap gap-3 text-[10px]">
           <span className="bg-white px-3 py-2 text-black">EVENTS</span>
-          <span className="px-3 py-2 text-white">LEADERBOARD</span>
+          <a className="px-3 py-2 text-white" href="/leaderboard">LARPERBOARD</a>
           <span className="px-3 py-2 text-white">FLAGS</span>
         </nav>
       </header>

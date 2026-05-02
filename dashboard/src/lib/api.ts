@@ -32,6 +32,7 @@ export type Attendee = {
   photo_url: string | null;
   profile_pic_url?: string | null;
   larp_score?: number | null;
+  flag_count?: number;
   processing_status?: string;
   consented_to_recording: boolean;
   imported_at: string;
@@ -156,6 +157,18 @@ export type AttendeeSummary = {
   profile_larp_label?: string | null;
 };
 
+export type LeaderboardEntry = {
+  rank: number;
+  attendee: Attendee;
+  larp_score: number;
+  flag_count: number;
+};
+
+export type EventFlag = Flag & {
+  attendee?: Attendee | null;
+  attendee_name?: string | null;
+};
+
 // NEXT_PUBLIC_API_BASE must be set at deploy time to point to the backend host.
 // In local development (`npm run dev`) it falls back to http://localhost:8000.
 // In production, omitting it means all API calls will silently target localhost —
@@ -216,6 +229,8 @@ export const api = {
       body: JSON.stringify({ event_id: eventId, device_id: deviceId })
     }),
   attendees: (eventId: string) => request<{ attendees: Attendee[]; next_cursor: string | null }>(`/events/${eventId}/attendees`),
+  leaderboard: (eventId?: string) => request<{ leaderboard: LeaderboardEntry[] }>(eventId ? `/leaderboard?event_id=${encodeURIComponent(eventId)}` : "/leaderboard"),
+  flags: (eventId: string) => request<{ flags: EventFlag[] }>(`/events/${eventId}/flags`),
   createAttendee: (eventId: string, data: Partial<Attendee>) =>
     request<{ attendee: Attendee }>(`/events/${eventId}/attendees`, {
       method: "POST",

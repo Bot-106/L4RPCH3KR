@@ -9,6 +9,8 @@ from app.routers import (
     create_event,
     delete_attendee,
     event_stats,
+    event_flags,
+    event_leaderboard,
     export_event,
     get_event,
     import_attendees,
@@ -148,6 +150,13 @@ async def test_dashboard_event_attendee_import_update_delete_export_flow() -> No
     assert stats["avg_score"] == 0.5
     assert stats["flags"] == 1
     assert stats["latest_flag"]["severity"] == "medium"
+
+    leaderboard = await event_leaderboard(event_id, db, user)
+    assert leaderboard["leaderboard"][0]["attendee"]["full_name"] == "Pat Updated"
+    assert leaderboard["leaderboard"][0]["flag_count"] == 1
+
+    flags = await event_flags(event_id, db, user)
+    assert flags["flags"][0]["attendee_name"] == "Pat Updated"
 
     response = await export_event(event_id, create_token(user["id"], "organizer"), db)
     body = response.body.decode()

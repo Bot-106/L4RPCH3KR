@@ -20,12 +20,17 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
   const [createOpen, setCreateOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createForm, setCreateForm] = useState({ full_name: "", email: "", github_login: "", linkedin_url: "", headline: "" });
-  const exportHref = `${api.exportUrl(eventId)}?token=${encodeURIComponent(getToken())}`;
+  const [exportHref, setExportHref] = useState(`${api.exportUrl(eventId)}?token=`);
 
   const sorted = useMemo(() => [...attendees].sort((a, b) => String(a[sort] ?? "").localeCompare(String(b[sort] ?? ""))), [attendees, sort]);
 
   function isHttpUrl(value: string | null | undefined) {
     return typeof value === "string" && /^https?:\/\//.test(value) && !value.includes("<");
+  }
+
+  function larpometer(score: number | null | undefined) {
+    if (score == null || Number.isNaN(score)) return null;
+    return Math.round(Math.min(1, Math.max(0, score)) * 100);
   }
 
   async function load() {
@@ -170,7 +175,9 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
   }
 
   useEffect(() => {
-    if (!localStorage.getItem("larpchekr_jwt")) {
+    const token = getToken();
+    setExportHref(`${api.exportUrl(eventId)}?token=${encodeURIComponent(token)}`);
+    if (!token) {
       window.location.href = "/sign-in";
       return;
     }
@@ -186,6 +193,8 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
         </div>
         <nav className="flex flex-wrap gap-3 text-[10px]">
           <a className="px-3 py-2" href="/events">EVENTS</a>
+          <a className="px-3 py-2" href={`/leaderboard?event_id=${encodeURIComponent(eventId)}`}>LARPERBOARD</a>
+          <a className="px-3 py-2" href={`/events/${eventId}/flags`}>FLAGS</a>
           <a className="px-3 py-2" href={`/events/${eventId}/live`}>LIVE</a>
           <a className="px-3 py-2" href={exportHref}>EXPORT</a>
         </nav>
@@ -294,7 +303,7 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
         <section className="mt-6 overflow-hidden rounded-3xl border border-stone-300 bg-white">
           <div className="grid grid-cols-[1.4fr_0.8fr_0.6fr_0.8fr_1fr_1fr_0.7fr] gap-3 border-b border-stone-200 bg-stone-950 px-4 py-3 text-sm font-bold text-white">
             <button className="text-left" onClick={() => setSort("full_name")}>Name</button>
-            <span>Score</span>
+            <span>Larpometer™</span>
             <span>Flags</span>
             <span>GitHub</span>
             <span>LinkedIn</span>
@@ -314,12 +323,12 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
                 )}
                 <button className="min-w-0 flex-1 truncate rounded-lg px-2 py-1 text-left font-semibold text-orange-700 underline-offset-2 hover:underline" onClick={() => void openSummary(attendee)}>{attendee.full_name}</button>
               </div>
-              <span className="rounded-lg bg-stone-100 px-2 py-1 font-bold">{attendee.larp_score == null ? "unavailable" : attendee.larp_score.toFixed(2)}</span>
-              <span className="px-2 py-1">-</span>
+              <span className="rounded-lg bg-stone-100 px-2 py-1 font-bold">{larpometer(attendee.larp_score) == null ? "unavailable" : larpometer(attendee.larp_score)}</span>
+              <span className="px-2 py-1 font-bold">{attendee.flag_count ?? 0}</span>
               <input className="rounded-lg border border-stone-200 px-2 py-1" defaultValue={attendee.github_login ?? ""} onBlur={(e) => void update(attendee, "github_login", e.target.value)} />
-              <div className="flex min-w-0 gap-2">
-                <input className="min-w-0 flex-1 rounded-lg border border-stone-200 px-2 py-1" defaultValue={attendee.linkedin_url ?? ""} placeholder="LinkedIn URL or img snippet" onBlur={(e) => e.target.value !== (attendee.linkedin_url ?? "") ? void update(attendee, "linkedin_url", e.target.value) : undefined} />
-                {isHttpUrl(attendee.linkedin_url) ? <a className="rounded-lg bg-blue-50 px-2 py-1 font-bold text-blue-700 underline" href={attendee.linkedin_url ?? ""} target="_blank" rel="noreferrer">Open</a> : null}
+              <div className="flex min-w-0 items-center justify-end gap-2">
+                <input className="min-w-0 w-full max-w-[240px] rounded-lg border border-stone-200 px-2 py-1 text-right" defaultValue={attendee.linkedin_url ?? ""} placeholder="LinkedIn URL or img snippet" onBlur={(e) => e.target.value !== (attendee.linkedin_url ?? "") ? void update(attendee, "linkedin_url", e.target.value) : undefined} />
+                {isHttpUrl(attendee.linkedin_url) ? <a className="ml-auto rounded-lg bg-blue-50 px-2 py-1 font-bold text-blue-700 underline" href={attendee.linkedin_url ?? ""} target="_blank" rel="noreferrer">Open</a> : null}
               </div>
               <span className="rounded-lg bg-emerald-50 px-2 py-1 font-bold text-emerald-800">{attendee.processing_status ?? "ready"}</span>
               <button className="rounded-lg bg-red-50 px-3 py-1 font-bold text-red-700" onClick={() => void remove(attendee)}>Delete</button>
@@ -367,8 +376,8 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
                 <div className="flex items-center gap-3 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3">
                   <span className="text-2xl">🎭</span>
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-widest text-stone-500">Larp Score</p>
-                    <p className="text-xl font-black">{summary.larp_score != null ? summary.larp_score.toFixed(2) : "No data"}</p>
+                    <p className="text-xs font-bold uppercase tracking-widest text-stone-500">Larpometer™</p>
+                    <p className="text-xl font-black">{larpometer(summary.larp_score) != null ? larpometer(summary.larp_score) : "No data"}</p>
                     {summary.profile_larp_label ? <p className="text-xs text-stone-500">{summary.profile_larp_label}</p> : null}
                   </div>
                   {summary.flags.length > 0 && (
@@ -408,8 +417,8 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
 
                       {summary.comparison.larp_score != null && (
                         <div className="rounded-xl bg-white/70 px-3 py-2">
-                          <p className="text-xs font-bold text-stone-600">Haiku LARP score</p>
-                          <p className="text-lg font-black text-stone-950">{summary.comparison.larp_score.toFixed(2)}</p>
+                          <p className="text-xs font-bold text-stone-600">Haiku Larpometer™</p>
+                          <p className="text-lg font-black text-stone-950">{larpometer(summary.comparison.larp_score) ?? 0}</p>
                           {summary.comparison.larp_score_reason && <p className="text-xs text-stone-600">{summary.comparison.larp_score_reason}</p>}
                         </div>
                       )}
