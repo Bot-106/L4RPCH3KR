@@ -354,6 +354,20 @@ export default function LaptopLivePage({ params }: { params: Promise<{ eventId: 
             {!claims.length ? <p className="text-sm text-stone-400">Claims will appear when the backend extracts them.</p> : null}
           </div>
         </section>
+
+        <div className="mt-6 flex justify-center">
+          <button
+            onClick={() => {
+              setFlags([]);
+              setScore(0);
+              setScoreLabel("flags cleared");
+            }}
+            disabled={flags.length === 0}
+            className="rounded-2xl border border-red-500/40 bg-red-950/60 px-6 py-3 font-black text-red-100 hover:bg-red-950 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Clear flags
+          </button>
+        </div>
       </div>
     </main>
   );

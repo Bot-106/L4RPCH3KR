@@ -1,34 +1,49 @@
-from app.identity.linkedin_scraper import linkedin_user_id_from_url, normalize_linkedin_profile
+from app.identity.linkedin_scraper import _normalize, _parse_profile_text
 
 
-def test_linkedin_user_id_from_url() -> None:
-    assert linkedin_user_id_from_url("https://www.linkedin.com/in/patpython") == "patpython"
-    assert linkedin_user_id_from_url("https://linkedin.com/in/pat-python_1/") == "pat-python_1"
-    assert linkedin_user_id_from_url("linkedin.com/in/pat.python") == "pat.python"
-    assert linkedin_user_id_from_url("https://www.linkedin.com/company/example") is None
+def test_parse_profile_text_extracts_core_sections() -> None:
+    parsed = _parse_profile_text(
+        """
+Pat Python
+Backend Engineer | Python | FastAPI
+San Francisco, California, United States
+1,234 followers
+About
+I build APIs and data pipelines.
+Experience
+Senior Engineer
+Acme Corp
+2022 - Present
+Education
+Example University
+BS Computer Science
+Skills
+Python
+FastAPI
+"""
+    )
+
+    assert parsed["name"] == "Pat Python"
+    assert parsed["headline"] == "Backend Engineer | Python | FastAPI"
+    assert parsed["location"] == "San Francisco, California, United States"
+    assert parsed["followers"] == "1,234 followers"
+    assert parsed["about"] == "I build APIs and data pipelines."
+    assert parsed["experiences"] == [
+        {"title": "Senior Engineer", "company": "Acme Corp", "dates": "2022 - Present"}
+    ]
+    assert parsed["education"] == [
+        {"school": "Example University", "degree": "BS Computer Science"}
+    ]
+    assert parsed["skills"] == ["Python", "FastAPI"]
 
 
-def test_normalize_linkedin_profile() -> None:
-    normalized = normalize_linkedin_profile(
-        {
-            "Basic Details": {
-                "Name": "Pat Python",
-                "Title": "Backend Engineer",
-                "Summary": "Builds APIs",
-            },
-            "Work Experience Details": [{"Title": "Engineer", "Company": "Acme"}],
-            "Education Details": [{"Institute": "Example University"}],
-            "Project Details": [{"Name": "Verifier"}],
-            "Recommendations": ["Great teammate"],
-        },
+def test_normalize_mcp_profile_keeps_raw_text_for_haiku() -> None:
+    normalized = _normalize(
+        {"sections": {"main_profile": "Pat Python\nBackend Engineer | Python"}},
         "https://www.linkedin.com/in/patpython",
     )
 
-    assert normalized["name"] == "Pat Python"
-    assert normalized["headline"] == "Backend Engineer"
-    assert normalized["about"] == "Builds APIs"
-    assert normalized["experiences"] == [{"Title": "Engineer", "Company": "Acme"}]
-    assert normalized["education"] == [{"Institute": "Example University"}]
-    assert normalized["projects"] == [{"Name": "Verifier"}]
-    assert normalized["recommendations"] == ["Great teammate"]
     assert normalized["scraped"] is True
+    assert normalized["name"] == "Pat Python"
+    assert normalized["headline"] == "Backend Engineer | Python"
+    assert normalized["_raw_text"] == "Pat Python\nBackend Engineer | Python"

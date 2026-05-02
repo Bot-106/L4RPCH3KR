@@ -17,6 +17,9 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
   const [selectedAttendee, setSelectedAttendee] = useState<Attendee | null>(null);
   const [summary, setSummary] = useState<AttendeeSummary | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createForm, setCreateForm] = useState({ full_name: "", email: "", github_login: "", linkedin_url: "", headline: "" });
   const exportHref = `${api.exportUrl(eventId)}?token=${encodeURIComponent(getToken())}`;
 
   const sorted = useMemo(() => [...attendees].sort((a, b) => String(a[sort] ?? "").localeCompare(String(b[sort] ?? ""))), [attendees, sort]);
@@ -64,6 +67,34 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
     } catch (err) {
       setStatus("");
       setError(err instanceof Error ? err.message : "Import failed");
+    }
+  }
+
+  async function createUser() {
+    if (!createForm.full_name.trim()) {
+      setError("Name is required.");
+      return;
+    }
+    try {
+      setCreating(true);
+      setError(null);
+      const res = await api.createAttendee(eventId, {
+        full_name: createForm.full_name.trim(),
+        email: createForm.email.trim(),
+        github_login: createForm.github_login.trim(),
+        linkedin_url: createForm.linkedin_url.trim(),
+        headline: createForm.headline.trim(),
+      });
+      setAttendees((rows) => [res.attendee, ...rows]);
+      setCreateForm({ full_name: "", email: "", github_login: "", linkedin_url: "", headline: "" });
+      setCreateOpen(false);
+      setStatus(`Created ${res.attendee.full_name}.`);
+      const statsRes = await api.stats(eventId);
+      setStats(statsRes);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Create user failed");
+    } finally {
+      setCreating(false);
     }
   }
 
@@ -128,6 +159,8 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
       console.log("Verified profile:", res.verified_profile);
       console.groupEnd();
       setSummary(res);
+      setSelectedAttendee(res.attendee);
+      setAttendees((rows) => rows.map((row) => (row.id === attendee.id ? res.attendee : row)));
     } catch (err) {
       console.error("[LARPCHEKR] summary fetch failed:", err);
       setSummary(null);
@@ -165,8 +198,62 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
               Upload CSV
               <input className="hidden" type="file" accept=".csv,text/csv" onChange={(e) => void upload(e.target.files?.[0])} />
             </label>
+            <button
+              className="rounded-xl bg-stone-950 px-5 py-3 font-bold text-white"
+              onClick={() => setCreateOpen((open) => !open)}
+              type="button"
+            >
+              {createOpen ? "Cancel" : "Create user"}
+            </button>
             <p className="text-sm text-stone-600">Required columns: firstname,lastname. Optional: linkedin,github,instagram,website</p>
           </div>
+          {createOpen ? (
+            <div className="mt-4 rounded-2xl border border-stone-200 bg-stone-50 p-4">
+              <div className="grid gap-3 md:grid-cols-2">
+                <input
+                  className="rounded-xl border border-stone-300 px-3 py-2"
+                  placeholder="Full name"
+                  value={createForm.full_name}
+                  onChange={(e) => setCreateForm((form) => ({ ...form, full_name: e.target.value }))}
+                />
+                <input
+                  className="rounded-xl border border-stone-300 px-3 py-2"
+                  placeholder="Email"
+                  type="email"
+                  value={createForm.email}
+                  onChange={(e) => setCreateForm((form) => ({ ...form, email: e.target.value }))}
+                />
+                <input
+                  className="rounded-xl border border-stone-300 px-3 py-2"
+                  placeholder="GitHub username"
+                  value={createForm.github_login}
+                  onChange={(e) => setCreateForm((form) => ({ ...form, github_login: e.target.value }))}
+                />
+                <input
+                  className="rounded-xl border border-stone-300 px-3 py-2"
+                  placeholder="LinkedIn URL"
+                  value={createForm.linkedin_url}
+                  onChange={(e) => setCreateForm((form) => ({ ...form, linkedin_url: e.target.value }))}
+                />
+                <input
+                  className="rounded-xl border border-stone-300 px-3 py-2 md:col-span-2"
+                  placeholder="Headline"
+                  value={createForm.headline}
+                  onChange={(e) => setCreateForm((form) => ({ ...form, headline: e.target.value }))}
+                />
+              </div>
+              <div className="mt-3 flex justify-end">
+                <button
+                  className="rounded-xl bg-orange-600 px-5 py-2 font-bold text-white disabled:opacity-50"
+                  disabled={creating}
+                  onClick={() => void createUser()}
+                  type="button"
+                >
+                  {creating ? "Creating..." : "Create user"}
+                </button>
+              </div>
+            </div>
+          ) : null}
           {status ? <p className="mt-4 rounded-xl bg-stone-100 p-3 text-sm">{status}</p> : null}
           {error ? <p className="mt-4 rounded-xl bg-red-100 p-3 text-sm text-red-800">{error}</p> : null}
           {importErrors.length ? (
@@ -270,6 +357,7 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
                   <div>
                     <p className="text-xs font-bold uppercase tracking-widest text-stone-500">Larp Score</p>
                     <p className="text-xl font-black">{summary.larp_score != null ? summary.larp_score.toFixed(2) : "No data"}</p>
+                    {summary.profile_larp_label ? <p className="text-xs text-stone-500">{summary.profile_larp_label}</p> : null}
                   </div>
                   {summary.flags.length > 0 && (
                     <span className="ml-auto rounded-full bg-red-100 px-3 py-1 text-sm font-bold text-red-700">{summary.flags.length} flag{summary.flags.length !== 1 ? "s" : ""}</span>
@@ -305,6 +393,14 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
                           <p className="text-xs text-stone-600 italic">{summary.comparison.credibility_reason}</p>
                         )}
                       </div>
+
+                      {summary.comparison.larp_score != null && (
+                        <div className="rounded-xl bg-white/70 px-3 py-2">
+                          <p className="text-xs font-bold text-stone-600">Haiku LARP score</p>
+                          <p className="text-lg font-black text-stone-950">{summary.comparison.larp_score.toFixed(2)}</p>
+                          {summary.comparison.larp_score_reason && <p className="text-xs text-stone-600">{summary.comparison.larp_score_reason}</p>}
+                        </div>
+                      )}
 
                       {/* LinkedIn summary */}
                       {summary.comparison.linkedin_summary && (

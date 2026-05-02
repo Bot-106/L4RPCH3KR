@@ -172,7 +172,7 @@ async def extract_claim(text: str, utterance_id: str) -> dict | None:
             return _make_claim(
                 utterance_id, text,
                 c.get("kind", "language_experience"),
-                c.get("subject", ""),
+                str(c.get("subject", "")).lower().strip(),
                 c.get("predicate", ""),
                 c.get("value", {}),
                 c.get("hedge", "none"),

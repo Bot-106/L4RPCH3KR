@@ -120,3 +120,66 @@ def score_label(score: float) -> str:
     if score < 0.6:
         return "approaching freestyle"
     return "full improv mode"
+
+
+def calculate_profile_larp_score(comparison: dict) -> tuple[float, str]:
+    """
+    Calculate LARP score based on LinkedIn/GitHub profile discrepancies.
+    
+    Returns (score, label) where score is 0.0-1.0 and label is human-readable.
+    """
+    if not comparison or "error" in comparison:
+        return 0.0, "no comparison data"
+    
+    discrepancies = comparison.get("discrepancies", [])
+    if not discrepancies:
+        credibility = comparison.get("credibility", "UNKNOWN")
+        if credibility == "CONSISTENT":
+            return 0.0, "profiles match"
+        elif credibility == "MINOR_GAPS":
+            return 0.1, "minor gaps"
+        return 0.0, "no discrepancies"
+    
+    # Filter out formatting-only discrepancies (e.g., '@company' vs 'company')
+    meaningful_discrepancies = []
+    for d in discrepancies:
+        if isinstance(d, str):
+            # Skip pure formatting differences
+            d_lower = d.lower()
+            if any(x in d_lower for x in ["formatting", "punctuation", "capitalization", "@", "symbol"]):
+                continue
+            meaningful_discrepancies.append(d)
+        else:
+            # It's a dict, check if it's just formatting
+            desc = str(d.get("description", "")).lower()
+            if not any(x in desc for x in ["formatting", "punctuation", "capitalization", "@", "symbol"]):
+                meaningful_discrepancies.append(d)
+    
+    if not meaningful_discrepancies:
+        return 0.0, "no significant discrepancies"
+    
+    # Score based on number and severity of discrepancies
+    score = 0.0
+    severity_weights = {
+        "critical": 0.40,
+        "high": 0.25,
+        "medium": 0.15,
+        "low": 0.05,
+    }
+    
+    for discrepancy in meaningful_discrepancies:
+        # Handle both dict and string formats
+        if isinstance(discrepancy, dict):
+            severity = discrepancy.get("severity", "medium").lower()
+        else:
+            # If it's a string, treat as low-medium severity
+            severity = "low"
+        
+        weight = severity_weights.get(severity, 0.10)
+        score += weight
+    
+    # Cap at 1.0
+    score = min(1.0, score)
+    label = score_label(score)
+    
+    return score, label

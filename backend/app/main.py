@@ -125,6 +125,8 @@ async def handle_pi_ws(ws: WebSocket, token: str | None = None) -> None:
     try:
         while True:
             message = await ws.receive()
+            if message.get("type") == "websocket.disconnect":
+                break
             if "bytes" in message:
                 continue  # Pi no longer sends binary audio; ignore stale frames
             if "text" not in message:
@@ -182,6 +184,11 @@ async def handle_pi_ws(ws: WebSocket, token: str | None = None) -> None:
             else:
                 await ws.send_json(envelope("error", {"code": "unsupported_event_type", "message": f"unsupported event type {event_type}"}, session_id))
     except WebSocketDisconnect:
+        pass
+    except RuntimeError as exc:
+        if "disconnect message has been received" not in str(exc):
+            raise
+    finally:
         manager.unsubscribe(ws)
 
 

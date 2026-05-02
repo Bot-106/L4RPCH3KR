@@ -145,11 +145,15 @@ export type AttendeeSummary = {
     discrepancies?: string[];
     credibility?: "CONSISTENT" | "MINOR_GAPS" | "SIGNIFICANT_GAPS" | "UNKNOWN";
     credibility_reason?: string;
+    larp_score?: number;
+    larp_score_reason?: string;
     error?: string;
   };
   verified_profile: Record<string, unknown>;
   flags: Flag[];
   larp_score?: number | null;
+  profile_larp_score?: number | null;
+  profile_larp_label?: string | null;
 };
 
 // NEXT_PUBLIC_API_BASE must be set at deploy time to point to the backend host.
@@ -212,6 +216,12 @@ export const api = {
       body: JSON.stringify({ event_id: eventId, device_id: deviceId })
     }),
   attendees: (eventId: string) => request<{ attendees: Attendee[]; next_cursor: string | null }>(`/events/${eventId}/attendees`),
+  createAttendee: (eventId: string, data: Partial<Attendee>) =>
+    request<{ attendee: Attendee }>(`/events/${eventId}/attendees`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    }),
   importCsv: (eventId: string, file: File) => {
     const form = new FormData();
     form.set("csv", file);

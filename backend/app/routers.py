@@ -488,8 +488,10 @@ async def attendee_summary(event_id: str, attendee_id: str, db: AsyncIOMotorData
             import anthropic
             client_ai = anthropic.Anthropic(api_key=anthropic_key)
 
-            # Pass the full raw LinkedIn text so Claude can extract everything
-            raw_linkedin_text = linkedin_data.pop("_raw_text", "") or ""
+            # Pass both the structured scrape and the full raw LinkedIn text so Claude
+            # can compare the actual scraped profile data against GitHub evidence.
+            raw_linkedin_text = linkedin_data.get("_raw_text", "") or ""
+            linkedin_for_prompt = {k: v for k, v in linkedin_data.items() if k != "_raw_text"}
 
             gh_summary = ""
             if github_data.get("login"):
@@ -512,6 +514,9 @@ async def attendee_summary(event_id: str, attendee_id: str, db: AsyncIOMotorData
 === RAW LINKEDIN PAGE TEXT ===
 {raw_linkedin_text[:4000] if raw_linkedin_text else "(LinkedIn not available)"}
 
+=== STRUCTURED LINKEDIN DATA ===
+{json.dumps(linkedin_for_prompt, indent=2, default=str)[:6000]}
+
 === GITHUB DATA ===
 {gh_summary}
 
@@ -524,7 +529,9 @@ Tasks — respond ONLY with a single JSON object, no markdown fences:
 3. "github_summary": 1-2 sentence summary of what GitHub activity actually shows.
 4. "discrepancies": array of specific mismatches between LinkedIn claims and GitHub evidence.
 5. "credibility": one of CONSISTENT / MINOR_GAPS / SIGNIFICANT_GAPS
-6. "credibility_reason": 1-sentence reason."""
+6. "credibility_reason": 1-sentence reason.
+7. "larp_score": number from 0.0 to 1.0 where 0 means the profiles match and 1 means major professional claims look unsupported.
+8. "larp_score_reason": 1 sentence explaining that score."""
 
             print(f"[CLAUDE] calling claude-haiku-4-5 for extraction + comparison...")
             resp = client_ai.messages.create(
@@ -557,7 +564,23 @@ Tasks — respond ONLY with a single JSON object, no markdown fences:
             print(f"[CLAUDE] ERROR: {exc}")
             comparison = {"error": str(exc)}
 
-    print(f"\n[SUMMARY DONE] github_keys={list(github_data.keys())} linkedin_scraped={linkedin_data.get('scraped')} comparison_keys={list(comparison.keys())}\n")
+    from app.pipeline.score import calculate_profile_larp_score
+    
+    ai_score = comparison.get("larp_score")
+    if isinstance(ai_score, int | float):
+        profile_score = max(0.0, min(1.0, float(ai_score)))
+        profile_label = score_label(profile_score)
+    else:
+        profile_score, profile_label = calculate_profile_larp_score(comparison)
+    
+    # Update the field the dashboard list and summary actually render.
+    await db.attendees.update_one(
+        {"id": attendee_id},
+        {"$set": {"larp_score": profile_score, "profile_larp_score": profile_score}}
+    )
+    attendee = await db.attendees.find_one({"id": attendee_id, "event_id": event_id}) or attendee
+    
+    print(f"\n[SUMMARY DONE] github_keys={list(github_data.keys())} linkedin_scraped={linkedin_data.get('scraped')} comparison_keys={list(comparison.keys())} profile_larp_score={profile_score}\n")
 
     return {
         "attendee": serializers.attendee(attendee),
@@ -566,7 +589,9 @@ Tasks — respond ONLY with a single JSON object, no markdown fences:
         "comparison": comparison,
         "verified_profile": verified_profile,
         "flags": [serializers.flag(f) for f in flags],
-        "larp_score": attendee.get("larp_score"),
+        "larp_score": profile_score,
+        "profile_larp_score": profile_score,
+        "profile_larp_label": profile_label,
     }
 
 
