@@ -27,5 +27,8 @@ class Settings(BaseSettings):
     whisper_compute_type: str = "auto"
     asr_chunk_seconds: float = 3.0
 
+    linkedin_email: str = ""
+    linkedin_password: str = ""
+
 
 settings = Settings()

@@ -1,4 +1,5 @@
 import json
+import logging
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -14,7 +15,32 @@ from app.pipeline.orchestrator import process_simulated_utterance
 from app.routers import router
 from app.ws_manager import envelope, manager
 
+log = logging.getLogger(__name__)
+
 app = FastAPI(title="L4RPCH3KR API", version=settings.version)
+
+
+@app.on_event("startup")
+async def _log_config() -> None:
+    log.warning(
+        "startup: fixture_mode=%s whisper_model=%s llm_provider=%s anthropic_key=%s openai_key=%s",
+        settings.fixture_mode,
+        settings.whisper_model,
+        settings.llm_provider,
+        bool(settings.anthropic_api_key),
+        bool(settings.openai_api_key),
+    )
+
+
+@app.get("/debug/config")
+async def debug_config() -> dict:
+    return {
+        "fixture_mode": settings.fixture_mode,
+        "whisper_model": settings.whisper_model,
+        "llm_provider": settings.llm_provider,
+        "anthropic_key_set": bool(settings.anthropic_api_key),
+        "openai_key_set": bool(settings.openai_api_key),
+    }
 
 app.add_middleware(
     CORSMiddleware,

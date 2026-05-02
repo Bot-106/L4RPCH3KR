@@ -107,6 +107,44 @@ export type ImportJob = {
   errors: Array<{ row_number?: number; row?: unknown; message: string }>;
 };
 
+export type AttendeeSummary = {
+  attendee: Attendee;
+  github: {
+    login?: string;
+    name?: string;
+    bio?: string;
+    company?: string;
+    location?: string;
+    public_repos?: number;
+    followers?: number;
+    avatar_url?: string;
+    html_url?: string;
+    top_languages?: string[];
+    recent_repos?: { name: string; description?: string | null; stars: number; url: string }[];
+  };
+  linkedin: {
+    // scraped via real Chrome session
+    scraped?: boolean;
+    name?: string | null;
+    headline?: string | null;
+    about?: string | null;
+    location?: string | null;
+    followers?: string | null;
+    photoUrl?: string | null;
+    experiences?: { title: string; company?: string | null; dates?: string | null }[];
+    education?: { school: string; degree?: string | null }[];
+    skills?: string[];
+    url?: string | null;
+    // fallback og: meta fields
+    title?: string | null;
+    description?: string | null;
+    image?: string | null;
+  };
+  verified_profile: Record<string, unknown>;
+  flags: Flag[];
+  larp_score?: number | null;
+};
+
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
 
 export function apiWsUrl(path: string) {
@@ -176,6 +214,7 @@ export const api = {
       body: JSON.stringify(data)
     }),
   fetchProfilePhoto: (eventId: string, attendeeId: string) => request<{ attendee: Attendee; profile_pic_url: string; source: string; has_embedding: boolean }>(`/events/${eventId}/attendees/${attendeeId}/profile-photo`, { method: "POST" }),
+  attendeeSummary: (eventId: string, attendeeId: string) => request<AttendeeSummary>(`/events/${eventId}/attendees/${attendeeId}/summary`),
   deleteAttendee: (eventId: string, attendeeId: string) => request<{ attendee: Attendee }>(`/events/${eventId}/attendees/${attendeeId}`, { method: "DELETE" }),
   exportUrl: (eventId: string) => `${API_BASE}/events/${eventId}/export`
 };

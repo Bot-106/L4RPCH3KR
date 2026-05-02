@@ -355,6 +355,76 @@ async def fetch_attendee_profile_photo(event_id: str, attendee_id: str, db: Asyn
     return {"attendee": serializers.attendee(attendee), "profile_pic_url": image_url, "source": source or "linkedin_profile_page", "has_embedding": embedding is not None}
 
 
+@router.get("/events/{event_id}/attendees/{attendee_id}/summary")
+async def attendee_summary(event_id: str, attendee_id: str, db: AsyncIOMotorDatabase = Depends(get_db), _: dict = Depends(current_user)) -> dict:
+    import httpx
+    from app.identity.linkedin_scraper import scrape_linkedin_profile
+
+    attendee = await db.attendees.find_one({"id": attendee_id, "event_id": event_id, "deleted_at": None})
+    if attendee is None:
+        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "attendee not found"}})
+
+    github_data: dict = {}
+    github_login = attendee.get("github_login") or (attendee.get("socials") or {}).get("github")
+    if github_login:
+        try:
+            async with httpx.AsyncClient(timeout=6.0) as client:
+                user_resp = await client.get(
+                    f"https://api.github.com/users/{github_login}",
+                    headers={"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"},
+                )
+                if user_resp.status_code == 200:
+                    gh = user_resp.json()
+                    github_data = {
+                        "login": gh.get("login"),
+                        "name": gh.get("name"),
+                        "bio": gh.get("bio"),
+                        "company": gh.get("company"),
+                        "location": gh.get("location"),
+                        "public_repos": gh.get("public_repos"),
+                        "followers": gh.get("followers"),
+                        "avatar_url": gh.get("avatar_url"),
+                        "html_url": gh.get("html_url"),
+                    }
+                repos_resp = await client.get(
+                    f"https://api.github.com/users/{github_login}/repos",
+                    params={"per_page": 100, "type": "owner", "sort": "pushed"},
+                    headers={"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"},
+                )
+                if repos_resp.status_code == 200:
+                    repos = repos_resp.json()
+                    lang_counts: dict[str, int] = {}
+                    for r in repos:
+                        if r.get("language"):
+                            lang_counts[r["language"]] = lang_counts.get(r["language"], 0) + 1
+                    github_data["top_languages"] = sorted(lang_counts, key=lambda k: -lang_counts[k])[:6]
+                    github_data["recent_repos"] = [
+                        {"name": r["name"], "description": r.get("description"), "stars": r.get("stargazers_count", 0), "url": r.get("html_url")}
+                        for r in repos[:5]
+                    ]
+        except Exception:
+            pass
+
+    # Use real Chrome with existing LinkedIn session to scrape the full profile
+    linkedin_data: dict = {}
+    linkedin_url = attendee.get("linkedin_url") or (attendee.get("socials") or {}).get("linkedin")
+    if linkedin_url and linkedin_url.startswith("http"):
+        linkedin_data = await scrape_linkedin_profile(linkedin_url)
+
+    flags = await db.flags.find({"subject_id": attendee_id}).sort("created_at", -1).to_list(50)
+    profile = await db.profiles.find_one({"attendee_id": attendee_id})
+    verified_profile = (profile.get("facts") if profile else None) or attendee.get("verified_profile") or {}
+
+    return {
+        "attendee": serializers.attendee(attendee),
+        "github": github_data,
+        "linkedin": linkedin_data,
+        "verified_profile": verified_profile,
+        "flags": [serializers.flag(f) for f in flags],
+        "larp_score": attendee.get("larp_score"),
+    }
+
+
 @router.delete("/events/{event_id}/attendees/{attendee_id}")
 async def delete_attendee(event_id: str, attendee_id: str, db: AsyncIOMotorDatabase = Depends(get_db), _: dict = Depends(organizer_user)) -> dict:
     attendee = await db.attendees.find_one({"id": attendee_id, "event_id": event_id, "deleted_at": None})

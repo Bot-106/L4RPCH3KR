@@ -1,7 +1,7 @@
 "use client";
 
 import { use, useEffect, useMemo, useState } from "react";
-import { api, Attendee, Event, EventStats, getToken } from "@/lib/api";
+import { api, Attendee, AttendeeSummary, Event, EventStats, getToken } from "@/lib/api";
 
 export default function EventPage({ params }: { params: Promise<{ eventId: string }> }) {
   const { eventId } = use(params);
@@ -14,6 +14,9 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [photoLoading, setPhotoLoading] = useState<string | null>(null);
+  const [selectedAttendee, setSelectedAttendee] = useState<Attendee | null>(null);
+  const [summary, setSummary] = useState<AttendeeSummary | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
   const exportHref = `${api.exportUrl(eventId)}?token=${encodeURIComponent(getToken())}`;
 
   const sorted = useMemo(() => [...attendees].sort((a, b) => String(a[sort] ?? "").localeCompare(String(b[sort] ?? ""))), [attendees, sort]);
@@ -109,6 +112,20 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
     }
   }
 
+  async function openSummary(attendee: Attendee) {
+    setSelectedAttendee(attendee);
+    setSummary(null);
+    setSummaryLoading(true);
+    try {
+      const res = await api.attendeeSummary(eventId, attendee.id);
+      setSummary(res);
+    } catch {
+      setSummary(null);
+    } finally {
+      setSummaryLoading(false);
+    }
+  }
+
   useEffect(() => {
     if (!localStorage.getItem("larpchekr_jwt")) {
       window.location.href = "/sign-in";
@@ -186,7 +203,7 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
                 ) : (
                   <button className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-stone-200 text-xs font-black text-stone-600" title="Fetch profile photo" onClick={() => void fetchPhoto(attendee)} disabled={photoLoading === attendee.id}>{photoLoading === attendee.id ? "..." : "?"}</button>
                 )}
-                <input className="min-w-0 flex-1 rounded-lg border border-stone-200 px-2 py-1" defaultValue={attendee.full_name} onBlur={(e) => void update(attendee, "full_name", e.target.value)} />
+                <button className="min-w-0 flex-1 truncate rounded-lg px-2 py-1 text-left font-semibold text-orange-700 underline-offset-2 hover:underline" onClick={() => void openSummary(attendee)}>{attendee.full_name}</button>
               </div>
               <span className="rounded-lg bg-stone-100 px-2 py-1 font-bold">{attendee.larp_score == null ? "unavailable" : attendee.larp_score.toFixed(2)}</span>
               <span className="px-2 py-1">-</span>
@@ -203,6 +220,207 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
           {loading ? <p className="p-6 text-sm text-stone-600">Loading attendees...</p> : null}
         </section>
       </div>
+
+      {/* Attendee summary side panel */}
+      {selectedAttendee ? (
+        <div className="fixed inset-0 z-50 flex justify-end" onClick={() => setSelectedAttendee(null)}>
+          <div className="w-full max-w-md overflow-y-auto bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 flex items-center justify-between border-b border-stone-200 bg-white px-6 py-4">
+              <div className="flex items-center gap-3">
+                {(summary?.attendee.profile_pic_url ?? summary?.attendee.photo_url ?? summary?.github.avatar_url) ? (
+                  <img
+                    className="h-12 w-12 rounded-full object-cover ring-2 ring-stone-200"
+                    src={summary?.attendee.profile_pic_url ?? summary?.attendee.photo_url ?? summary?.github.avatar_url ?? ""}
+                    alt={selectedAttendee.full_name}
+                  />
+                ) : (
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-orange-100 text-lg font-black text-orange-700">
+                    {selectedAttendee.full_name.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <div>
+                  <h2 className="text-lg font-black">{selectedAttendee.full_name}</h2>
+                  <p className="text-sm text-stone-500">{selectedAttendee.headline ?? summary?.github.bio ?? ""}</p>
+                </div>
+              </div>
+              <button className="rounded-lg p-2 text-stone-400 hover:bg-stone-100 hover:text-stone-700" onClick={() => setSelectedAttendee(null)}>✕</button>
+            </div>
+
+            {summaryLoading ? (
+              <div className="flex flex-col items-center justify-center gap-3 py-20 text-stone-400">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-stone-200 border-t-orange-500" />
+                <p className="text-sm">Fetching profile data...</p>
+              </div>
+            ) : summary ? (
+              <div className="space-y-6 p-6">
+
+                {/* Larp score */}
+                <div className="flex items-center gap-3 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3">
+                  <span className="text-2xl">🎭</span>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-widest text-stone-500">Larp Score</p>
+                    <p className="text-xl font-black">{summary.larp_score != null ? summary.larp_score.toFixed(2) : "No data"}</p>
+                  </div>
+                  {summary.flags.length > 0 && (
+                    <span className="ml-auto rounded-full bg-red-100 px-3 py-1 text-sm font-bold text-red-700">{summary.flags.length} flag{summary.flags.length !== 1 ? "s" : ""}</span>
+                  )}
+                </div>
+
+                {/* LinkedIn section — scraped via real Chrome session */}
+                {selectedAttendee.linkedin_url ? (
+                  <div>
+                    <h3 className="mb-2 text-xs font-bold uppercase tracking-widest text-stone-500">LinkedIn</h3>
+                    {summary.linkedin.scraped ? (
+                      <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4 space-y-3">
+                        <div className="flex items-center gap-3">
+                          {(summary.linkedin.photoUrl ?? summary.linkedin.image) && (
+                            <img className="h-14 w-14 rounded-full object-cover ring-2 ring-white shrink-0" src={summary.linkedin.photoUrl ?? summary.linkedin.image ?? ""} alt="LinkedIn" />
+                          )}
+                          <div>
+                            <p className="font-bold text-blue-900">{summary.linkedin.name ?? selectedAttendee.full_name}</p>
+                            {summary.linkedin.headline && <p className="text-sm text-blue-800">{summary.linkedin.headline}</p>}
+                            {summary.linkedin.location && <p className="text-xs text-blue-600">📍 {summary.linkedin.location}</p>}
+                          </div>
+                        </div>
+                        {summary.linkedin.about && (
+                          <div>
+                            <p className="mb-1 text-xs font-bold text-blue-700">About</p>
+                            <p className="text-sm text-blue-900 line-clamp-4">{summary.linkedin.about}</p>
+                          </div>
+                        )}
+                        {summary.linkedin.experiences && summary.linkedin.experiences.length > 0 && (
+                          <div>
+                            <p className="mb-1.5 text-xs font-bold text-blue-700">Experience</p>
+                            <div className="space-y-1.5">
+                              {summary.linkedin.experiences.map((exp, i) => (
+                                <div key={i} className="rounded-lg bg-white/60 px-3 py-2 text-sm">
+                                  <p className="font-semibold text-blue-900">{exp.title}</p>
+                                  {exp.company && <p className="text-blue-700">{exp.company}</p>}
+                                  {exp.dates && <p className="text-xs text-blue-500">{exp.dates}</p>}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {summary.linkedin.education && summary.linkedin.education.length > 0 && (
+                          <div>
+                            <p className="mb-1.5 text-xs font-bold text-blue-700">Education</p>
+                            <div className="space-y-1">
+                              {summary.linkedin.education.map((edu, i) => (
+                                <div key={i} className="rounded-lg bg-white/60 px-3 py-2 text-sm">
+                                  <p className="font-semibold text-blue-900">{edu.school}</p>
+                                  {edu.degree && <p className="text-blue-700">{edu.degree}</p>}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {summary.linkedin.skills && summary.linkedin.skills.length > 0 && (
+                          <div>
+                            <p className="mb-1.5 text-xs font-bold text-blue-700">Skills</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {summary.linkedin.skills.map((s) => (
+                                <span key={s} className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-800">{s}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {isHttpUrl(selectedAttendee.linkedin_url) && (
+                          <a className="inline-block rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-bold text-white" href={selectedAttendee.linkedin_url} target="_blank" rel="noreferrer">Open LinkedIn →</a>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-500">
+                        Could not scrape LinkedIn (Chrome may not be logged in, or playwright not installed).{" "}
+                        {isHttpUrl(selectedAttendee.linkedin_url) && (
+                          <a className="font-bold text-blue-600 underline" href={selectedAttendee.linkedin_url} target="_blank" rel="noreferrer">Open manually →</a>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+
+                {/* GitHub section */}
+                {summary.github.login ? (
+                  <div>
+                    <h3 className="mb-2 text-xs font-bold uppercase tracking-widest text-stone-500">GitHub</h3>
+                    <div className="rounded-2xl border border-stone-200 bg-white p-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="font-bold">{summary.github.name ?? summary.github.login}</p>
+                          {summary.github.bio && <p className="mt-1 text-sm text-stone-600">{summary.github.bio}</p>}
+                          {summary.github.company && <p className="mt-1 text-sm text-stone-500">🏢 {summary.github.company}</p>}
+                          {summary.github.location && <p className="text-sm text-stone-500">📍 {summary.github.location}</p>}
+                        </div>
+                        <div className="flex shrink-0 flex-col items-end gap-1 text-sm">
+                          <span className="font-bold">{summary.github.public_repos ?? 0} repos</span>
+                          <span className="text-stone-500">{summary.github.followers ?? 0} followers</span>
+                        </div>
+                      </div>
+
+                      {summary.github.top_languages && summary.github.top_languages.length > 0 && (
+                        <div className="mt-3">
+                          <p className="mb-1.5 text-xs font-bold text-stone-500">Top languages</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {summary.github.top_languages.map((lang) => (
+                              <span key={lang} className="rounded-full bg-stone-100 px-2.5 py-1 text-xs font-bold text-stone-700">{lang}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {summary.github.recent_repos && summary.github.recent_repos.length > 0 && (
+                        <div className="mt-3">
+                          <p className="mb-1.5 text-xs font-bold text-stone-500">Recent repos</p>
+                          <div className="space-y-1.5">
+                            {summary.github.recent_repos.map((repo) => (
+                              <a key={repo.name} href={repo.url} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-lg border border-stone-100 px-3 py-2 text-sm hover:bg-stone-50">
+                                <span className="font-medium text-stone-800">{repo.name}</span>
+                                <span className="text-stone-400">⭐ {repo.stars}</span>
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {summary.github.html_url && (
+                        <a className="mt-3 inline-block rounded-lg bg-stone-900 px-3 py-1.5 text-sm font-bold text-white" href={summary.github.html_url} target="_blank" rel="noreferrer">View GitHub →</a>
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+
+                {/* Flags */}
+                {summary.flags.length > 0 && (
+                  <div>
+                    <h3 className="mb-2 text-xs font-bold uppercase tracking-widest text-stone-500">Recent Flags</h3>
+                    <div className="space-y-2">
+                      {summary.flags.slice(0, 5).map((flag) => (
+                        <div key={flag.id} className={`rounded-xl border p-3 text-sm ${flag.severity === "high" ? "border-red-200 bg-red-50" : flag.severity === "medium" ? "border-amber-200 bg-amber-50" : "border-stone-200 bg-stone-50"}`}>
+                          <div className="flex items-center gap-2">
+                            <span className={`rounded-full px-2 py-0.5 text-xs font-bold uppercase ${flag.severity === "high" ? "bg-red-100 text-red-700" : flag.severity === "medium" ? "bg-amber-100 text-amber-700" : "bg-stone-200 text-stone-600"}`}>{flag.severity}</span>
+                            <span className="text-stone-600">{flag.verified_text ?? flag.explanation ?? "Claim mismatch detected"}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* No data fallback */}
+                {!summary.github.login && !summary.linkedin.title && summary.flags.length === 0 && (
+                  <div className="rounded-2xl border border-dashed border-stone-300 p-6 text-center text-stone-400">
+                    <p className="text-2xl">🔍</p>
+                    <p className="mt-2 text-sm">No profile data found. Add a GitHub login or LinkedIn URL to enrich this attendee.</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="p-6 text-center text-sm text-stone-400">Failed to load profile data.</div>
+            )}
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }
