@@ -227,10 +227,10 @@ Response: text/csv
 ## Health
 
 ### `GET /healthz`
-Returns 200 OK if the server can reach Postgres and Redis. No auth.
+Returns 200 OK if the server can reach MongoDB. No auth.
 
 ```json
-{ "ok": true, "db": "ok", "redis": "ok", "version": "0.1.0" }
+{ "ok": true, "mongo": "ok", "version": "0.1.0" }
 ```
 
 ## Open questions

@@ -17,8 +17,8 @@ In:
 - Larp scoring.
 - Async background workers (CSV import enrichment, profile refresh, transcript finalize).
 - Magic-link email + GitHub OAuth.
-- Postgres migrations.
-- WS pub/sub via Redis for multi-process scale (one process is fine for v1).
+- MongoDB persistence and indexes.
+- In-process WS fan-out (one process is fine for v1).
 
 Out (v1):
 - Multi-region.
@@ -30,15 +30,13 @@ Out (v1):
 
 - **Python 3.11**
 - **FastAPI** + **uvicorn** (`--workers 1` for v1, `--reload` in dev)
-- **Postgres 15** with `pgvector` for voice embeddings
-- **Redis 7** for WS pub/sub and short-lived state
-- **SQLAlchemy 2.0** + **Alembic** for ORM/migrations
+- **MongoDB 7** for attendees, sessions, utterances, claims, flags, profile facts, and voice calibration docs
 - **faster-whisper** (CTranslate2) for ASR — `small.en` default, configurable
 - **speechbrain** ECAPA-TDNN for speaker embeddings
 - **Anthropic Python SDK** for claim extraction (or OpenAI; configurable per env)
 - **PyGithub** for GitHub profile fetch
 - **httpx** for any other outbound HTTP
-- **arq** for background workers (Redis-backed)
+- In-process background tasks for v1 enrichment jobs
 - **pytest** + **pytest-asyncio** for tests
 - **ruff** for lint
 
@@ -50,30 +48,16 @@ backend/
 ├── pyproject.toml
 ├── requirements.txt
 ├── .env.example
-├── alembic.ini
-├── alembic/
-│   └── versions/              ← migrations (Engineer B)
 ├── app/
 │   ├── __init__.py
 │   ├── main.py                ← FastAPI app factory
 │   ├── config.py              ← pydantic settings
-│   ├── db.py                  ← SQLAlchemy engine + session
-│   ├── redis.py               ← redis client
+│   ├── db.py                  ← MongoDB client + database dependency
 │   ├── deps.py                ← FastAPI dependencies (auth, db session)
 │   ├── auth/
 │   │   ├── jwt.py
 │   │   ├── magic_link.py
 │   │   └── github_oauth.py
-│   ├── models/                ← SQLAlchemy ORM models
-│   │   ├── user.py
-│   │   ├── event.py
-│   │   ├── attendee.py
-│   │   ├── session.py
-│   │   ├── utterance.py
-│   │   ├── claim.py
-│   │   ├── flag.py
-│   │   ├── profile.py
-│   │   └── voice_calibration.py
 │   ├── routers/               ← FastAPI route modules
 │   │   ├── auth.py
 │   │   ├── users.py
@@ -84,7 +68,7 @@ backend/
 │   ├── ws/
 │   │   ├── pi.py              ← /ws/pi handler
 │   │   ├── phone.py           ← /ws/phone handler
-│   │   └── pubsub.py          ← redis fan-out
+│   │   └── pubsub.py          ← future external fan-out, not used in v1
 │   ├── pipeline/
 │   │   ├── asr.py             ← faster-whisper wrapper
 │   │   ├── diarize.py         ← ECAPA embedding match
@@ -113,7 +97,7 @@ backend/
 ## External interfaces
 
 ### Consumes
-- Postgres + Redis (local docker-compose, prod managed).
+- MongoDB (local docker-compose, prod managed).
 - Anthropic / OpenAI API for claim extraction.
 - GitHub API (PAT or OAuth on behalf of user).
 - SMTP (resend.com or postmark for magic-link delivery).
@@ -129,8 +113,8 @@ Reads from `backend/.env`:
 
 | Var | Required | Example |
 |-----|----------|---------|
-| `DATABASE_URL` | yes | `postgresql+asyncpg://localhost:5432/larpchekr` |
-| `REDIS_URL` | yes | `redis://localhost:6379/0` |
+| `MONGO_URL` | yes | `mongodb://localhost:27017` |
+| `MONGO_DB` | yes | `larpchekr` |
 | `JWT_SECRET` | yes | random 64 bytes |
 | `MAGIC_LINK_FROM` | yes | `noreply@larpchekr.app` |
 | `RESEND_API_KEY` | yes (prod) | |
@@ -152,10 +136,10 @@ pip install -r requirements.txt
 cp .env.example .env
 
 # infra
-docker compose -f ../infra/docker-compose.dev.yml up -d postgres redis
+docker compose -f ../infra/docker-compose.dev.yml up -d mongo
 
 # migrations + seed
-alembic upgrade head
+python -m app.scripts.init_db
 python -m app.scripts.seed_event
 
 # server
@@ -167,7 +151,7 @@ python -m app.scripts.sim_pi --session-id <id-from-seed>
 
 ## MVP checklist
 
-- [ ] Postgres schema for all models, migrations land cleanly.
+- [ ] Mongo collections/indexes initialize cleanly.
 - [ ] `/healthz` green.
 - [ ] Magic-link auth issues a JWT.
 - [ ] GitHub OAuth links `github_login` to a user.

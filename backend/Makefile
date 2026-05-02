@@ -1,17 +1,10 @@
-.PHONY: contracts test lint run migrate revision
+.PHONY: contracts test lint run migrate
 
 contracts:
-	datamodel-codegen \
-		--input ../contracts/schemas \
-		--input-file-type jsonschema \
-		--output app/contracts/generated \
-		--output-model-type pydantic_v2.BaseModel
+	python -m app.scripts.generate_contracts
 
 migrate:
-	alembic upgrade head
-
-revision:
-	@read -p "message: " msg && alembic revision --autogenerate -m "$$msg"
+	python -m app.scripts.init_db
 
 test:
 	pytest

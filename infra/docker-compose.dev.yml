@@ -1,14 +1,12 @@
 services:
-  postgres:
-    image: pgvector/pgvector:pg15
+  mongo:
+    image: mongo:7
     environment:
-      POSTGRES_USER: larpchekr
-      POSTGRES_PASSWORD: larpchekr
-      POSTGRES_DB: larpchekr
+      MONGO_INITDB_DATABASE: larpchekr
     ports:
-      - "5432:5432"
+      - "27017:27017"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - mongodata:/data/db
 
   redis:
     image: redis:7-alpine
@@ -16,4 +14,4 @@ services:
       - "6379:6379"
 
 volumes:
-  pgdata:
+  mongodata:

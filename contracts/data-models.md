@@ -182,7 +182,7 @@ Per-session float in [0, 1], computed as a logistic on summed `score_delta` weig
 |-------|------|-------|
 | `id` | ulid | |
 | `user_id` | ulid | |
-| `embedding` | float[192] | ECAPA-TDNN (`pgvector`) |
+| `embedding` | float[192] | ECAPA-TDNN vector stored in MongoDB |
 | `sample_audio_url` | string | for re-calibration |
 | `created_at` | datetime | |
 
