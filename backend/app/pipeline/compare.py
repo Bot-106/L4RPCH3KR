@@ -106,6 +106,45 @@ async def compare_claim(db: AsyncIOMotorDatabase, session: dict, claim: dict) ->
             return None
         verified_text = f"No record of {subject} education in verified profile."
 
+    elif kind == "quantitative":
+        # Compare claimed vs. verified quantities (awards, publications, etc.)
+        claimed_amount = claim.get("value", {}).get("amount")
+        claimed_metric = claim.get("value", {}).get("metric", subject)
+        
+        if claimed_amount is None:
+            return None
+        
+        # Try to find matching metric in verified facts
+        verified_metrics = facts.get("metrics", {})
+        verified_amount = verified_metrics.get(claimed_metric.lower())
+        
+        if verified_amount is None:
+            # No verified data for this metric, but claim was made with high confidence
+            if claim.get("extraction_confidence", 0) > 0.80:
+                verified_text = f"Claimed {claimed_amount} {claimed_metric}, but no verification data found in profile."
+            else:
+                return None  # low confidence, don't flag
+        elif claimed_amount > verified_amount:
+            # Claimed more than verified
+            verified_text = f"Claimed {claimed_amount} {claimed_metric}, but verified profile shows {verified_amount}."
+        else:
+            return None  # claim checks out or is conservative
+    
+    elif kind == "credential":
+        # Check if claimed credential exists in verified profile
+        claimed_cred = (claim.get("value", {}).get("credential") or "").lower()
+        if not claimed_cred:
+            return None
+        
+        verified_creds = {(item.get("credential") or "").lower() for item in facts.get("credentials", [])}
+        if not verified_creds:
+            return None  # no verified credentials to check against
+        
+        if claimed_cred in verified_creds:
+            return None  # credential verified
+        
+        verified_text = f"No record of '{claimed_cred}' credential in verified profile."
+
     else:
         return None
 
