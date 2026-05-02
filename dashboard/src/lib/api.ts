@@ -154,6 +154,7 @@ export type AttendeeSummary = {
   larp_score?: number | null;
   profile_larp_score?: number | null;
   profile_larp_label?: string | null;
+  dot_jots?: string[];
 };
 
 // NEXT_PUBLIC_API_BASE must be set at deploy time to point to the backend host.

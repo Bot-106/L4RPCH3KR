@@ -239,6 +239,7 @@ async def main() -> None:
                 lambda: ws_client.session_id,
                 stop_event,
                 on_transcript=preview.set_last_transcript,
+                get_face_ratio=lambda: preview.face_ratio(10.0),
             ),
             camera.run(
                 ws_client.send_envelope,

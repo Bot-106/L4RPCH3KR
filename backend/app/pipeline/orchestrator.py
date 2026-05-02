@@ -6,6 +6,7 @@ profile compare: 4 ms; Mongo write + websocket fan-out: 25 ms. Total p50: ~37 ms
 well under the 4s utterance-end to flag emit budget while real ML is integrated.
 """
 
+import asyncio
 from datetime import datetime, timedelta
 
 from motor.motor_asyncio import AsyncIOMotorDatabase
@@ -14,12 +15,13 @@ from app import serializers
 from app.identity.conversation_resolver import RESOLVE_EVERY, resolve_from_conversation
 from app.identity.name_extraction import resolve_by_name
 from app.pipeline.compare import compare_claim
+from app.pipeline.dot_jots import update_dot_jots
 from app.pipeline.extract import extract_claim
 from app.pipeline.score import compute_score, compute_score_ai, score_label
 from app.ws_manager import manager
 
 
-async def process_simulated_utterance(db: AsyncIOMotorDatabase, session_id: str, text: str, speaker: str = "partner", speaker_confidence: float | None = None) -> None:
+async def process_simulated_utterance(db: AsyncIOMotorDatabase, session_id: str, text: str, speaker: str = "partner", speaker_confidence: float | None = None, face_ratio: float = 1.0) -> None:
     print(f"[ORCH] process_simulated_utterance session_id={session_id} speaker={speaker} text={text[:60]!r}", flush=True)
     session = await db.sessions.find_one({"id": session_id})
     if session is None:
@@ -60,6 +62,9 @@ async def process_simulated_utterance(db: AsyncIOMotorDatabase, session_id: str,
     phone_count = len(manager.phones.get(session_id, set()))
     print(f"[ORCH] utterance inserted id={utterance['id']} — relaying to {phone_count} phone subscriber(s)", flush=True)
     await manager.send_phone(session_id, "transcript_update", {"session_id": session_id, "utterances": [serializers.utterance(utterance)]})
+
+    # Fire dot-jot synthesis as a background task — non-blocking for the main pipeline
+    asyncio.ensure_future(update_dot_jots(db, session_id, text, speaker, session, face_ratio))
 
     claim = await extract_claim(text, utterance["id"]) if speaker in {"partner", "subject"} else None
     if not claim:

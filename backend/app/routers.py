@@ -582,6 +582,19 @@ Tasks — respond ONLY with a single JSON object, no markdown fences:
     
     print(f"\n[SUMMARY DONE] github_keys={list(github_data.keys())} linkedin_scraped={linkedin_data.get('scraped')} comparison_keys={list(comparison.keys())} profile_larp_score={profile_score}\n")
 
+    # Collect dot-jots from the most recent sessions where this attendee was subject
+    recent_sessions = await db.sessions.find(
+        {"subject_id": attendee_id},
+        {"dot_jots": 1}
+    ).sort("started_at", -1).to_list(10)
+    dot_jots: list[str] = []
+    for s in reversed(recent_sessions):
+        dot_jots.extend(s.get("dot_jots") or [])
+    # Also include any direct real_statements on the attendee document
+    for stmt in (attendee.get("real_statements") or []):
+        if stmt not in dot_jots:
+            dot_jots.append(stmt)
+
     return {
         "attendee": serializers.attendee(attendee),
         "github": github_data,
@@ -592,6 +605,7 @@ Tasks — respond ONLY with a single JSON object, no markdown fences:
         "larp_score": profile_score,
         "profile_larp_score": profile_score,
         "profile_larp_label": profile_label,
+        "dot_jots": dot_jots,
     }
 
 
