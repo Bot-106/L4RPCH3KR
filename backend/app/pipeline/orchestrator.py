@@ -16,6 +16,7 @@ from app.identity.conversation_resolver import RESOLVE_EVERY, resolve_from_conve
 from app.identity.name_extraction import resolve_by_name
 from app.pipeline.compare import compare_claim
 from app.pipeline.dot_jots import update_dot_jots
+from app.pipeline.evaluate import evaluate_transcript_larp
 from app.pipeline.extract import extract_claims
 from app.pipeline.score import compute_score, compute_score_ai, score_label
 from app.ws_manager import manager
@@ -84,19 +85,43 @@ async def process_simulated_utterance(db: AsyncIOMotorDatabase, session_id: str,
     # Fire dot-jot synthesis as a background task — non-blocking for the main pipeline
     asyncio.ensure_future(update_dot_jots(db, session_id, text, speaker, session, face_ratio))
 
+    # Holistic transcript evaluation: compare spoken text vs stored profile.
+    # When this produces a score it owns the score update for this transcript window —
+    # we skip the downstream compute_score_ai calls to preserve gradual dampening.
+    subject_id = session.get("subject_id") or session.get("partner_attendee_id")
+    holistic_scored = False
+    if subject_id and speaker in {"partner", "subject"}:
+        new_score, eval_flag = await evaluate_transcript_larp(db, session, text, utterance["id"])
+        if new_score is not None:
+            holistic_scored = True
+            await db.sessions.update_one({"id": session_id}, {"$set": {"score": new_score, "score_label": score_label(new_score)}})
+            await update_attendee_larp_score(db, subject_id, new_score)
+            if eval_flag:
+                await db.flags.insert_one(eval_flag)
+                await manager.send_phone(
+                    session_id,
+                    "flag_raised",
+                    {"session_id": session_id, "flag": serializers.flag(eval_flag), "utterance": serializers.utterance(utterance)},
+                )
+                await manager.send_pi_haptic(eval_flag["severity"])
+                print(f"[EVAL] flag raised subject_id={subject_id} severity={eval_flag['severity']} score={new_score:.3f}", flush=True)
+            await manager.send_phone(session_id, "score_update", {"session_id": session_id, "score": new_score, "label": score_label(new_score)})
+            print(f"[EVAL] score_update sent session_id={session_id} score={new_score:.3f}", flush=True)
+
     claims = await extract_claims(text, utterance["id"]) if speaker in {"partner", "subject"} else []
     subject_id = session.get("subject_id") or session.get("partner_attendee_id")
     if not claims:
-        all_flags = await db.flags.find({"session_id": session_id}).to_list(None)
-        score = await compute_score_ai(db, session_id, all_flags)
-        await db.sessions.update_one({"id": session_id}, {"$set": {"score": score, "score_label": score_label(score)}})
-        if subject_id:
-            await update_attendee_larp_score(db, subject_id, score)
-            print(f"[SCORE] attendee_larp_score updated subject_id={subject_id} session_score={score:.3f}", flush=True)
-        else:
-            print("[SCORE] attendee_larp_score not updated (no subject_id)", flush=True)
-        await manager.send_phone(session_id, "score_update", {"session_id": session_id, "score": score, "label": score_label(score)})
-        print(f"[SCORE] session_score updated session_id={session_id} score={score:.3f}", flush=True)
+        if not holistic_scored:
+            all_flags = await db.flags.find({"session_id": session_id}).to_list(None)
+            score = await compute_score_ai(db, session_id, all_flags)
+            await db.sessions.update_one({"id": session_id}, {"$set": {"score": score, "score_label": score_label(score)}})
+            if subject_id:
+                await update_attendee_larp_score(db, subject_id, score)
+                print(f"[SCORE] attendee_larp_score updated subject_id={subject_id} session_score={score:.3f}", flush=True)
+            else:
+                print("[SCORE] attendee_larp_score not updated (no subject_id)", flush=True)
+            await manager.send_phone(session_id, "score_update", {"session_id": session_id, "score": score, "label": score_label(score)})
+            print(f"[SCORE] session_score updated session_id={session_id} score={score:.3f}", flush=True)
         return
     for claim in claims:
         await db.claims.insert_one(claim)
@@ -124,13 +149,14 @@ async def process_simulated_utterance(db: AsyncIOMotorDatabase, session_id: str,
             await manager.send_phone(session_id, "score_update", {"session_id": session_id, "score": score, "label": score_label(score)})
             await manager.send_pi_haptic(flag["severity"])
 
-    all_flags = await db.flags.find({"session_id": session_id}).to_list(None)
-    score = await compute_score_ai(db, session_id, all_flags)
-    await db.sessions.update_one({"id": session_id}, {"$set": {"score": score, "score_label": score_label(score)}})
-    if subject_id:
-        await update_attendee_larp_score(db, subject_id, score)
-        print(f"[SCORE] attendee_larp_score updated subject_id={subject_id} session_score={score:.3f}", flush=True)
-    else:
-        print("[SCORE] attendee_larp_score not updated (no subject_id)", flush=True)
-    await manager.send_phone(session_id, "score_update", {"session_id": session_id, "score": score, "label": score_label(score)})
-    print(f"[SCORE] session_score updated session_id={session_id} score={score:.3f}", flush=True)
+    if not holistic_scored:
+        all_flags = await db.flags.find({"session_id": session_id}).to_list(None)
+        score = await compute_score_ai(db, session_id, all_flags)
+        await db.sessions.update_one({"id": session_id}, {"$set": {"score": score, "score_label": score_label(score)}})
+        if subject_id:
+            await update_attendee_larp_score(db, subject_id, score)
+            print(f"[SCORE] attendee_larp_score updated subject_id={subject_id} session_score={score:.3f}", flush=True)
+        else:
+            print("[SCORE] attendee_larp_score not updated (no subject_id)", flush=True)
+        await manager.send_phone(session_id, "score_update", {"session_id": session_id, "score": score, "label": score_label(score)})
+        print(f"[SCORE] session_score updated session_id={session_id} score={score:.3f}", flush=True)
