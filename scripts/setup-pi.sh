@@ -23,7 +23,9 @@ sudo apt-get install -y --no-install-recommends \
   libzbar0 \
   libgl1 \
   v4l-utils \
-  alsa-utils
+  alsa-utils \
+  python3-dev \
+  gcc
 ok "System libraries installed."
 
 # ── 2. Python venv ────────────────────────────────────────────────────────────
@@ -37,13 +39,18 @@ ok "venv ready."
 # ── 3. Pip packages ───────────────────────────────────────────────────────────
 log "Installing Python dependencies (this may take a few minutes)..."
 .venv/bin/pip install --upgrade pip --quiet
+
+# Force-reinstall webrtcvad-wheels to replace any broken webrtcvad C extension
+.venv/bin/pip install --force-reinstall --quiet "webrtcvad-wheels>=2.0.10"
+
 .venv/bin/pip install -r requirements.txt
 ok "Python packages installed."
 
 # ── 4. Verify critical imports ────────────────────────────────────────────────
 log "Verifying imports..."
 IMPORT_OK=1
-for pkg in sounddevice webrtcvad cv2 faster_whisper pyzbar dotenv; do
+# webrtcvad is optional — audio.py falls back to "always stream" if missing
+for pkg in sounddevice cv2 faster_whisper pyzbar dotenv; do
   if .venv/bin/python -c "import $pkg" 2>/dev/null; then
     ok "  $pkg"
   else
@@ -52,8 +59,15 @@ for pkg in sounddevice webrtcvad cv2 faster_whisper pyzbar dotenv; do
   fi
 done
 
+# webrtcvad: warn only — audio works without it, just no VAD gating
+if .venv/bin/python -c "import webrtcvad" 2>/dev/null; then
+  ok "  webrtcvad (VAD enabled)"
+else
+  log "  webrtcvad — not available (audio will stream continuously, no VAD gating)"
+fi
+
 if [[ $IMPORT_OK -eq 0 ]]; then
-  err "Some imports failed. Check the errors above and retry."
+  err "Some critical imports failed. Check the errors above and retry."
   exit 1
 fi
 

@@ -3,7 +3,7 @@ faster-whisper>=1.0.0
 numpy>=1.24
 opencv-python-headless==4.10.0.84
 websockets==12.0
-webrtcvad==2.0.10
+webrtcvad-wheels>=2.0.10  # drop-in replacement with pre-built ARM wheels, works on Python 3.13
 gpiozero==2.0
 pyzbar==0.1.9
 httpx==0.27.0
