@@ -1,0 +1,54 @@
+# node
+node_modules/
+
+# RN build outputs
+ios/build/
+android/build/
+android/app/build/
+android/.gradle/
+
+# Generated contracts (rebuild with `npm run contracts`)
+src/contracts/generated/
+
+# Env — copy from .env.example
+.env
+
+# Metro cache
+.metro-health-check*
+
+# Xcode
+*.xcworkspace
+!*.xcodeproj/*.xcworkspace
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+xcuserdata/
+*.xccheckout
+*.moved-aside
+DerivedData
+*.hmap
+*.ipa
+*.xcuserstate
+ios/.xcode.env.local
+
+# Android
+*.apk
+*.aab
+.idea/
+.gradle/
+local.properties
+
+# CocoaPods
+/ios/Pods/
+/ios/vendor/
+
+# Watchman
+.watchmanconfig
+
+# TypeScript
+*.tsbuildinfo
