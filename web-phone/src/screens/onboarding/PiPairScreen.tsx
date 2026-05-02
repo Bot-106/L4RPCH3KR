@@ -74,17 +74,19 @@ export function PiPairScreen() {
                     <p className="text-sm text-text-muted text-center">QR expired</p>
                   </div>
                 ) : (
-                  <QRCodeSVG
-                    value={pairToken}
-                    size={160}
-                    bgColor="#ffffff"
-                    fgColor={colors.bg.canvas}
-                  />
-                  {import.meta.env.DEV && (
-                    <p className="text-xs text-center mt-2 text-text-muted font-mono">
-                      DEV — token: {DEV_PAIR_TOKEN}
-                    </p>
-                  )}
+                  <>
+                    <QRCodeSVG
+                      value={pairToken}
+                      size={160}
+                      bgColor="#ffffff"
+                      fgColor={colors.bg.canvas}
+                    />
+                    {import.meta.env.DEV && (
+                      <p className="text-xs text-center mt-2 text-text-muted font-mono">
+                        DEV — token: {DEV_PAIR_TOKEN}
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
               {expiresAt && !expired && (

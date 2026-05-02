@@ -6,15 +6,23 @@ import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { createPairing } from '@/lib/api'
 import { colors } from '@/theme/tokens'
 
+const DEV_PAIRING_TOKEN = 'dev-pairing-token'
+
 export function ShowQrScreen() {
   const navigate = useNavigate()
-  const [token, setToken] = useState<string | null>(null)
+  const [token, setToken] = useState<string | null>(
+    import.meta.env.DEV ? DEV_PAIRING_TOKEN : null
+  )
   const [qrUrl, setQrUrl] = useState<string | null>(null)
   const [expiresAt, setExpiresAt] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!import.meta.env.DEV)
   const [error, setError] = useState('')
 
   const fetchPairing = useCallback(async () => {
+    if (import.meta.env.DEV) {
+      setToken(DEV_PAIRING_TOKEN)
+      return
+    }
     setError('')
     setLoading(true)
     try {
@@ -30,7 +38,7 @@ export function ShowQrScreen() {
   }, [])
 
   useEffect(() => {
-    void fetchPairing()
+    if (!import.meta.env.DEV) void fetchPairing()
   }, [fetchPairing])
 
   const expired = expiresAt ? new Date(expiresAt) < new Date() : false
@@ -72,13 +80,20 @@ export function ShowQrScreen() {
                   <p className="text-sm text-text-muted">Expired</p>
                 </div>
               ) : (
-                <QRCodeSVG
-                  value={qrValue}
-                  size={192}
-                  bgColor="#ffffff"
-                  fgColor={colors.bg.canvas}
-                  level="M"
-                />
+                <>
+                  <QRCodeSVG
+                    value={qrValue}
+                    size={192}
+                    bgColor="#ffffff"
+                    fgColor={colors.bg.canvas}
+                    level="M"
+                  />
+                  {import.meta.env.DEV && (
+                    <p className="text-xs text-center mt-2 text-text-muted font-mono">
+                      DEV — token: {DEV_PAIRING_TOKEN}
+                    </p>
+                  )}
+                </>
               )}
             </div>
             {expiresAt && !expired && (
