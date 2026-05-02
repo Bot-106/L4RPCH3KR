@@ -123,7 +123,6 @@ export type AttendeeSummary = {
     recent_repos?: { name: string; description?: string | null; stars: number; url: string }[];
   };
   linkedin: {
-    // scraped via real Chrome session
     scraped?: boolean;
     name?: string | null;
     headline?: string | null;
@@ -135,10 +134,18 @@ export type AttendeeSummary = {
     education?: { school: string; degree?: string | null }[];
     skills?: string[];
     url?: string | null;
-    // fallback og: meta fields
+    error?: string | null;
     title?: string | null;
     description?: string | null;
     image?: string | null;
+  };
+  comparison?: {
+    linkedin_summary?: string;
+    github_summary?: string;
+    discrepancies?: string[];
+    credibility?: "CONSISTENT" | "MINOR_GAPS" | "SIGNIFICANT_GAPS" | "UNKNOWN";
+    credibility_reason?: string;
+    error?: string;
   };
   verified_profile: Record<string, unknown>;
   flags: Flag[];

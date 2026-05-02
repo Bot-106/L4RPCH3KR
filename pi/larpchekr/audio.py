@@ -194,6 +194,7 @@ class AudioCapture:
             log.info("audio: sounddevice stream started")
             speaking = False
             silent_count = 0
+            audio_buffer: list[bytes] = []  # Buffer audio frames during speech
 
             while not stop_event.is_set():
                 try:
@@ -205,6 +206,7 @@ class AudioCapture:
                 if session_id is None:
                     # No active session — don't send
                     speaking = False
+                    audio_buffer.clear()
                     continue
 
                 is_sp = self._is_speech(pcm)
@@ -213,17 +215,21 @@ class AudioCapture:
                     silent_count = 0
                     if not speaking:
                         speaking = True
+                        audio_buffer.clear()
                         await send_envelope(_make_audio_meta_envelope(session_id))
                         log.debug("audio: speech started")
+                    # Buffer the audio frame during speech (don't send yet)
+                    ms = int(time.time() * 1000)
+                    header = _make_audio_frame_header(ms)
+                    audio_buffer.append(header + pcm)
                 else:
                     silent_count += 1
                     if silent_count > HANGOVER_FRAMES:
                         if speaking:
-                            log.debug("audio: silence detected — hangover expired")
+                            log.debug("audio: silence detected — hangover expired, sending buffered audio")
+                            # Send all buffered audio at once when speech ends
+                            for buffered_frame in audio_buffer:
+                                await send_binary(buffered_frame)
+                            audio_buffer.clear()
                         speaking = False
                         continue
-
-                if speaking:
-                    ms = int(time.time() * 1000)
-                    header = _make_audio_frame_header(ms)
-                    await send_binary(header + pcm)

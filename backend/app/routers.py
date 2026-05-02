@@ -1,5 +1,6 @@
 import csv
 import io
+import re
 import secrets
 from datetime import datetime, timedelta
 from typing import Any
@@ -10,6 +11,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app import serializers
 from app.auth import create_token, decode_token
+from app.config import settings
 from app.db import get_db
 from app.deps import current_user, organizer_user
 from app.identity.face_matcher import face_matcher
@@ -340,23 +342,6 @@ async def update_attendee(event_id: str, attendee_id: str, payload: dict, db: As
 
 @router.post("/events/{event_id}/attendees/{attendee_id}/profile-photo")
 async def fetch_attendee_profile_photo(event_id: str, attendee_id: str, db: AsyncIOMotorDatabase = Depends(get_db), _: dict = Depends(organizer_user)) -> dict:
-    attendee = await db.attendees.find_one({"id": attendee_id, "event_id": event_id, "deleted_at": None})
-    if attendee is None:
-        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "attendee not found"}})
-    image_url, embedding, source = await face_matcher.resolve_profile_image(db, attendee)
-    if not image_url:
-        raise HTTPException(status_code=404, detail={"error": {"code": "profile_photo_not_found", "message": "no LinkedIn profile photo could be resolved"}})
-    update = {"profile_pic_url": image_url, "photo_url": image_url, "profile_image_source_url": image_url, "profile_image_source": source or "linkedin_profile_page", "processing_status": "ready"}
-    if embedding:
-        update["profile_image_embedding"] = embedding
-    await db.attendees.update_one({"id": attendee_id, "event_id": event_id}, {"$set": update})
-    face_matcher.event_id = None
-    attendee = await db.attendees.find_one({"id": attendee_id, "event_id": event_id})
-    return {"attendee": serializers.attendee(attendee), "profile_pic_url": image_url, "source": source or "linkedin_profile_page", "has_embedding": embedding is not None}
-
-
-@router.get("/events/{event_id}/attendees/{attendee_id}/summary")
-async def attendee_summary(event_id: str, attendee_id: str, db: AsyncIOMotorDatabase = Depends(get_db), _: dict = Depends(current_user)) -> dict:
     import httpx
     from app.identity.linkedin_scraper import scrape_linkedin_profile
 
@@ -364,15 +349,74 @@ async def attendee_summary(event_id: str, attendee_id: str, db: AsyncIOMotorData
     if attendee is None:
         raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "attendee not found"}})
 
+    image_url: str | None = None
+    source = "unknown"
+
+    # 1. Try LinkedIn via MCP scraper — photoUrl comes from og:image if the server exposes it
+    linkedin_url = attendee.get("linkedin_url") or (attendee.get("socials") or {}).get("linkedin")
+    if linkedin_url and linkedin_url.startswith("http"):
+        li = await scrape_linkedin_profile(linkedin_url)
+        if li.get("photoUrl"):
+            image_url = li["photoUrl"]
+            source = "linkedin_mcp"
+            print(f"[PHOTO] got photoUrl from LinkedIn MCP: {image_url[:80]}")
+
+    # 2. Fallback: GitHub avatar
+    if not image_url:
+        github_login = attendee.get("github_login") or (attendee.get("socials") or {}).get("github")
+        if github_login:
+            try:
+                async with httpx.AsyncClient(timeout=6.0) as client:
+                    resp = await client.get(
+                        f"https://api.github.com/users/{github_login}",
+                        headers={"Accept": "application/vnd.github+json"},
+                    )
+                    if resp.status_code == 200:
+                        image_url = resp.json().get("avatar_url")
+                        source = "github_avatar"
+                        print(f"[PHOTO] using GitHub avatar: {image_url}")
+            except Exception as exc:
+                print(f"[PHOTO] GitHub avatar fetch failed: {exc}")
+
+    if not image_url:
+        raise HTTPException(status_code=404, detail={"error": {"code": "profile_photo_not_found", "message": "no profile photo could be resolved"}})
+
+    await db.attendees.update_one(
+        {"id": attendee_id, "event_id": event_id},
+        {"$set": {"profile_pic_url": image_url, "photo_url": image_url, "profile_image_source": source, "processing_status": "ready"}},
+    )
+    attendee = await db.attendees.find_one({"id": attendee_id, "event_id": event_id})
+    return {"attendee": serializers.attendee(attendee), "profile_pic_url": image_url, "source": source, "has_embedding": False}
+
+
+@router.get("/events/{event_id}/attendees/{attendee_id}/summary")
+async def attendee_summary(event_id: str, attendee_id: str, db: AsyncIOMotorDatabase = Depends(get_db), _: dict = Depends(current_user)) -> dict:
+    import httpx
+    import json
+    from dotenv import dotenv_values
+    from pathlib import Path
+    from app.identity.linkedin_scraper import scrape_linkedin_profile
+
+    attendee = await db.attendees.find_one({"id": attendee_id, "event_id": event_id, "deleted_at": None})
+    if attendee is None:
+        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "attendee not found"}})
+
+    print(f"\n{'='*60}")
+    print(f"[SUMMARY] attendee={attendee.get('full_name')} id={attendee_id}")
+    print(f"[SUMMARY] github_login={attendee.get('github_login')} linkedin_url={attendee.get('linkedin_url')}")
+    print(f"{'='*60}\n")
+
+    # ── GitHub ─────────────────────────────────────────────────────────────────
     github_data: dict = {}
     github_login = attendee.get("github_login") or (attendee.get("socials") or {}).get("github")
     if github_login:
         try:
-            async with httpx.AsyncClient(timeout=6.0) as client:
+            async with httpx.AsyncClient(timeout=8.0) as client:
                 user_resp = await client.get(
                     f"https://api.github.com/users/{github_login}",
                     headers={"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"},
                 )
+                print(f"[GITHUB] GET /users/{github_login} → {user_resp.status_code}")
                 if user_resp.status_code == 200:
                     gh = user_resp.json()
                     github_data = {
@@ -386,11 +430,14 @@ async def attendee_summary(event_id: str, attendee_id: str, db: AsyncIOMotorData
                         "avatar_url": gh.get("avatar_url"),
                         "html_url": gh.get("html_url"),
                     }
+                    print(f"[GITHUB] data={json.dumps({k:v for k,v in github_data.items() if k!='avatar_url'}, indent=2)}")
+
                 repos_resp = await client.get(
                     f"https://api.github.com/users/{github_login}/repos",
                     params={"per_page": 100, "type": "owner", "sort": "pushed"},
                     headers={"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"},
                 )
+                print(f"[GITHUB] GET /users/{github_login}/repos → {repos_resp.status_code}")
                 if repos_resp.status_code == 200:
                     repos = repos_resp.json()
                     lang_counts: dict[str, int] = {}
@@ -402,23 +449,121 @@ async def attendee_summary(event_id: str, attendee_id: str, db: AsyncIOMotorData
                         {"name": r["name"], "description": r.get("description"), "stars": r.get("stargazers_count", 0), "url": r.get("html_url")}
                         for r in repos[:5]
                     ]
-        except Exception:
-            pass
+                    print(f"[GITHUB] top_languages={github_data['top_languages']}")
+                    print(f"[GITHUB] recent_repos={[r['name'] for r in github_data.get('recent_repos', [])]}")
+        except Exception as exc:
+            print(f"[GITHUB] ERROR: {exc}")
 
-    # Use real Chrome with existing LinkedIn session to scrape the full profile
+    # ── LinkedIn ───────────────────────────────────────────────────────────────
     linkedin_data: dict = {}
     linkedin_url = attendee.get("linkedin_url") or (attendee.get("socials") or {}).get("linkedin")
+    print(f"[LINKEDIN] url={linkedin_url}")
     if linkedin_url and linkedin_url.startswith("http"):
         linkedin_data = await scrape_linkedin_profile(linkedin_url)
+        # Full debug dump of everything we scraped
+        print(f"[LINKEDIN] RAW RESULT:")
+        try:
+            safe = {k: v for k, v in linkedin_data.items() if k not in ("photoUrl",)}
+            print(json.dumps(safe, indent=2, default=str))
+        except Exception:
+            print(repr(linkedin_data))
+    else:
+        print("[LINKEDIN] no URL — skipping scrape")
 
+    # ── Flags & verified profile ───────────────────────────────────────────────
     flags = await db.flags.find({"subject_id": attendee_id}).sort("created_at", -1).to_list(50)
     profile = await db.profiles.find_one({"attendee_id": attendee_id})
     verified_profile = (profile.get("facts") if profile else None) or attendee.get("verified_profile") or {}
+    print(f"[FLAGS] count={len(flags)}")
+    print(f"[VERIFIED_PROFILE] keys={list(verified_profile.keys())}")
+
+    # ── Claude comparison ──────────────────────────────────────────────────────
+    comparison: dict = {}
+    env_path = Path(__file__).resolve().parents[2] / ".env"
+    anthropic_key = dotenv_values(env_path).get("ANTHROPIC_API_KEY") or settings.anthropic_api_key
+    print(f"[CLAUDE] key_present={bool(anthropic_key)} linkedin_scraped={linkedin_data.get('scraped')} github_login={github_data.get('login')}")
+
+    if anthropic_key and (linkedin_data.get("scraped") or github_data.get("login")):
+        try:
+            import anthropic
+            client_ai = anthropic.Anthropic(api_key=anthropic_key)
+
+            # Pass the full raw LinkedIn text so Claude can extract everything
+            raw_linkedin_text = linkedin_data.pop("_raw_text", "") or ""
+
+            gh_summary = ""
+            if github_data.get("login"):
+                gh_summary = f"""GitHub Profile:
+- Login: {github_data.get('login')}
+- Name: {github_data.get('name', 'N/A')}
+- Bio: {github_data.get('bio', 'N/A')}
+- Company: {github_data.get('company', 'N/A')}
+- Public repos: {github_data.get('public_repos', 0)}
+- Followers: {github_data.get('followers', 0)}
+- Top languages: {', '.join(github_data.get('top_languages', []))}
+- Recent repos: {json.dumps([r['name'] for r in github_data.get('recent_repos', [])])}"""
+            else:
+                gh_summary = "GitHub: not connected."
+
+            attendee_name = attendee.get("full_name") or "this person"
+
+            prompt = f"""You are analyzing the professional profile of {attendee_name} for a hackathon credential check system.
+
+=== RAW LINKEDIN PAGE TEXT ===
+{raw_linkedin_text[:4000] if raw_linkedin_text else "(LinkedIn not available)"}
+
+=== GITHUB DATA ===
+{gh_summary}
+
+Tasks — respond ONLY with a single JSON object, no markdown fences:
+1. "extracted": Extract structured data from the LinkedIn text into:
+   - "experiences": list of {{title, company, dates}} — look for job titles, org names, date ranges anywhere in the text
+   - "education": list of {{school, degree}}
+   - "skills": list of skill names mentioned anywhere (programming languages, tools, frameworks, soft skills)
+2. "linkedin_summary": 2-3 sentence summary of their LinkedIn background and claims.
+3. "github_summary": 1-2 sentence summary of what GitHub activity actually shows.
+4. "discrepancies": array of specific mismatches between LinkedIn claims and GitHub evidence.
+5. "credibility": one of CONSISTENT / MINOR_GAPS / SIGNIFICANT_GAPS
+6. "credibility_reason": 1-sentence reason."""
+
+            print(f"[CLAUDE] calling claude-haiku-4-5 for extraction + comparison...")
+            resp = client_ai.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=1200,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            raw_resp = resp.content[0].text.strip()
+            print(f"[CLAUDE] raw response:\n{raw_resp}")
+
+            json_match = re.search(r'\{.*\}', raw_resp, re.DOTALL)
+            if json_match:
+                parsed = json.loads(json_match.group())
+                comparison = {k: v for k, v in parsed.items() if k != "extracted"}
+
+                # Merge Claude-extracted structured data back into linkedin_data
+                extracted = parsed.get("extracted") or {}
+                if extracted.get("experiences"):
+                    linkedin_data["experiences"] = extracted["experiences"]
+                if extracted.get("education"):
+                    linkedin_data["education"] = extracted["education"]
+                if extracted.get("skills"):
+                    linkedin_data["skills"] = extracted["skills"]
+
+                print(f"[CLAUDE] credibility={comparison.get('credibility')} extracted_exp={len(linkedin_data.get('experiences', []))} skills={linkedin_data.get('skills', [])[:5]}")
+            else:
+                comparison = {"linkedin_summary": raw_resp, "github_summary": "", "discrepancies": [], "credibility": "UNKNOWN", "credibility_reason": ""}
+
+        except Exception as exc:
+            print(f"[CLAUDE] ERROR: {exc}")
+            comparison = {"error": str(exc)}
+
+    print(f"\n[SUMMARY DONE] github_keys={list(github_data.keys())} linkedin_scraped={linkedin_data.get('scraped')} comparison_keys={list(comparison.keys())}\n")
 
     return {
         "attendee": serializers.attendee(attendee),
         "github": github_data,
         "linkedin": linkedin_data,
+        "comparison": comparison,
         "verified_profile": verified_profile,
         "flags": [serializers.flag(f) for f in flags],
         "larp_score": attendee.get("larp_score"),

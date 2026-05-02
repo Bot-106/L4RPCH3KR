@@ -129,17 +129,8 @@ class FaceMatcher:
         return None
 
     async def _profile_image_url_from_linkedin_page(self, url: str) -> str | None:
-        try:
-            async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as client:
-                response = await client.get(url, headers=REQUEST_HEADERS)
-            response.raise_for_status()
-            content_type = response.headers.get("content-type", "")
-            if "html" not in content_type and "text" not in content_type:
-                return None
-            return self._best_linkedin_image_from_html(response.text)
-        except Exception as exc:
-            log.warning("face: failed to resolve LinkedIn profile image %s: %s", url, exc)
-            return None
+        # LinkedIn returns 999 for unauthenticated requests — skip silently
+        return None
 
     def _profile_page_url(self, row: dict) -> str | None:
         socials = row.get("socials") or {}
@@ -153,18 +144,7 @@ class FaceMatcher:
         if image_url:
             embedding = await self._embedding_from_url(image_url)
             return image_url, embedding, "linkedin_img_snippet"
-
-        linkedin_url = self._profile_page_url(attendee)
-        if not linkedin_url:
-            return None, None, None
-        image_url = await self._profile_image_url_from_linkedin_page(linkedin_url)
-        if not image_url:
-            return None, None, None
-
-        embedding = await self._embedding_from_url(image_url)
-        if not embedding:
-            return image_url, None, "linkedin_profile_page"
-        return image_url, embedding, "linkedin_profile_page"
+        return None, None, None
 
     async def refresh(self, db: AsyncIOMotorDatabase, event_id: str) -> None:
         rows = await db.attendees.find({"event_id": event_id, "deleted_at": None}).to_list(None)

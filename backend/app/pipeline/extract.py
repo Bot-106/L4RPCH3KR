@@ -1,9 +1,20 @@
 import asyncio
 import json
 import logging
+import re
+from pathlib import Path
+
+from dotenv import dotenv_values
 
 from app import serializers
 from app.config import settings
+
+_ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
+
+
+def _anthropic_key() -> str:
+    """Read directly from .env to avoid OS env override stripping the key."""
+    return dotenv_values(_ENV_FILE).get("ANTHROPIC_API_KEY") or settings.anthropic_api_key
 
 log = logging.getLogger(__name__)
 
@@ -31,20 +42,42 @@ Value shapes:
 - credential: {"credential": str, "issuer": str|null}
 - quantitative: {"metric": str, "amount": number, "unit": str}
 
+IMPORTANT: Extract ONLY the most relevant and confident claim. Prioritize specificity:
+- "5 gold medals" → quantitative claim (metric=medals, amount=5, unit=count) with subject=gold
+- "5 years at Google" → employment (don't also extract years as quantitative)
+- "published 3 papers" → quantitative (metric=papers, amount=3, unit=count)
+
 Return ONLY a JSON array of claims, or [] if none. No prose."""
 
 
 async def _extract_with_anthropic(text: str) -> list[dict]:
     import anthropic
-    model = settings.llm_model if "claude" in settings.llm_model else "claude-haiku-4-5-20251001"
-    client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
-    msg = await client.messages.create(
-        model=model,
-        max_tokens=512,
-        system=_SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": text}],
-    )
-    return json.loads(msg.content[0].text.strip())
+    key = _anthropic_key()
+    model = settings.llm_model if "claude" in settings.llm_model else "claude-haiku-4-5"
+    print(f"[EXTRACT] key_present={bool(key)} key_prefix={key[:12] if key else 'EMPTY'} model={model}")
+    if not key:
+        raise ValueError("ANTHROPIC_API_KEY is empty")
+    client = anthropic.AsyncAnthropic(api_key=key)
+    try:
+        msg = await client.messages.create(
+            model=model,
+            max_tokens=512,
+            system=_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": text}],
+        )
+    except anthropic.APIStatusError as e:
+        print(f"[EXTRACT] API error status={e.status_code} body={e.body}")
+        raise
+    raw = msg.content[0].text.strip() if msg.content else ""
+    print(f"[EXTRACT] raw response ({len(raw)} chars): {raw[:300]}")
+    if not raw:
+        return []
+    # Strip markdown fences if present
+    if raw.startswith("```"):
+        raw = re.sub(r"^```[a-z]*\n?", "", raw)
+        raw = re.sub(r"\n?```$", "", raw)
+        raw = raw.strip()
+    return json.loads(raw)
 
 
 async def _extract_with_openai(text: str) -> list[dict]:
@@ -64,6 +97,25 @@ async def _extract_with_openai(text: str) -> list[dict]:
 
 def _keyword_fallback(text: str, utterance_id: str) -> dict | None:
     lower = text.lower()
+    
+    # Check for quantitative claims first (numbers + units)
+    import re
+    # Match patterns like "5 gold medals", "3 papers", "10 years"
+    number_match = re.search(r'(\d+)\s+([a-z\s]+)', lower)
+    if number_match:
+        amount = int(number_match.group(1))
+        unit_text = number_match.group(2).strip()
+        # Map common units
+        if 'medal' in unit_text:
+            return _make_claim(utterance_id, text, "quantitative", unit_text.split()[0] if unit_text else "medal",
+                             "count", {"metric": "medals", "amount": amount, "unit": "count"}, "none", 0.80)
+        elif 'paper' in unit_text or 'publication' in unit_text:
+            return _make_claim(utterance_id, text, "quantitative", "publications",
+                             "count", {"metric": "papers", "amount": amount, "unit": "count"}, "none", 0.80)
+        elif 'project' in unit_text:
+            return _make_claim(utterance_id, text, "quantitative", "projects",
+                             "count", {"metric": "projects", "amount": amount, "unit": "count"}, "none", 0.80)
+    
     if "rust" in lower:
         return _make_claim(utterance_id, text, "language_experience", "rust",
                            "experience_years", {"years": 5, "shipping_prod": True}, "none", 0.92)
@@ -108,7 +160,7 @@ async def extract_claim(text: str, utterance_id: str) -> dict | None:
         return _keyword_fallback(text, utterance_id)
     try:
         # Auto-select provider based on which key is actually present
-        if settings.anthropic_api_key:
+        if _anthropic_key():
             fn = _extract_with_anthropic
         elif settings.openai_api_key:
             fn = _extract_with_openai

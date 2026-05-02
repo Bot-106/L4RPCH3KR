@@ -304,15 +304,6 @@ export default function LaptopLivePage({ params }: { params: Promise<{ eventId: 
                 <div className="flex justify-between gap-3"><dt className="text-stone-400">Haptic mirror</dt><dd className="font-bold">{lastHaptic ?? "none"}</dd></div>
               </dl>
             </div>
-            <div className="rounded-[2rem] border border-sky-300/40 bg-sky-950/50 p-6">
-              <p className="text-xs font-black uppercase tracking-[0.25em] text-sky-200">Camera identity</p>
-              <p className="mt-3 text-2xl font-black">{subject?.attendee?.full_name ?? (subject?.attendee_id ? "Known attendee" : subject?.reason ? "No profile photo match" : "Scanning...")}</p>
-              <p className="mt-2 text-sm text-sky-100">
-                {subject ? `${Math.round(subject.confidence * 100)}% via ${subject.method.replaceAll("_", " ")}` : "Snapshots are sent every 10s."}
-              </p>
-              {subject?.reason ? <p className="mt-2 text-xs text-sky-200">{subject.reason.replaceAll("_", " ")}</p> : null}
-              {subject?.attendee?.github_login ? <p className="mt-2 text-xs text-sky-200">GitHub: {subject.attendee.github_login}</p> : null}
-            </div>
           </div>
         </section>
 

@@ -3,6 +3,7 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
+import numpy as np
 from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -15,6 +16,20 @@ from app.pipeline.diarize import classify_speaker
 from app.pipeline.orchestrator import process_simulated_utterance
 from app.routers import router
 from app.ws_manager import envelope, manager
+
+# --- Voice Activity Detection (energy-based) ---
+_VAD_SILENCE_RMS = 400        # int16 amplitude units; below this = silence (~-38 dBFS)
+_VAD_SILENCE_FRAMES = 3       # consecutive silent Pi frames (~750 ms) before flushing
+_VAD_MAX_BUFFER_SECS = 20     # hard cap — flush even if no pause detected
+
+
+def _frame_is_silent(frame: bytes) -> bool:
+    """Return True if the PCM frame is below the silence threshold."""
+    if not frame or len(frame) < 2:
+        return True
+    pcm = np.frombuffer(frame, dtype=np.int16)
+    rms = float(np.sqrt(np.mean(pcm.astype(np.float32) ** 2)))
+    return rms < _VAD_SILENCE_RMS
 
 log = logging.getLogger(__name__)
 

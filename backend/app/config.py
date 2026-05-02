@@ -3,7 +3,6 @@ from pathlib import Path
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
 ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
 
 
@@ -51,6 +50,7 @@ class Settings(BaseSettings):
 
     linkedin_email: str = ""
     linkedin_password: str = ""
+    linkedin_cookie: str = ""
 
 
 settings = Settings()

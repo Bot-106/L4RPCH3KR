@@ -1,0 +1,7 @@
+INFO:     Will watch for changes in these directories: ['C:\\Users\\arnna\\Desktop\\L4RPCH3KR\\backend']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [3652] using WatchFiles
+INFO:     Started server process [28456]
+INFO:     Waiting for application startup.
+startup: fixture_mode=False whisper_model=base.en llm_provider=anthropic anthropic_key=False openai_key=True cors_origins=http://localhost:3000,http://localhost:3001,http://100.76.124.67:3000,http://100.76.124.67:3001,http://100.90.235.28:3000,http://100.90.235.28:3001
+INFO:     Application startup complete.

@@ -118,8 +118,18 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
     setSummaryLoading(true);
     try {
       const res = await api.attendeeSummary(eventId, attendee.id);
+      // ── DEBUG: log everything the backend returned ──────────────────────────
+      console.group(`[LARPCHEKR] Profile summary for ${attendee.full_name}`);
+      console.log("Full response:", res);
+      console.log("GitHub data:", res.github);
+      console.log("LinkedIn data:", res.linkedin);
+      console.log("Comparison:", res.comparison);
+      console.log("Flags:", res.flags);
+      console.log("Verified profile:", res.verified_profile);
+      console.groupEnd();
       setSummary(res);
-    } catch {
+    } catch (err) {
+      console.error("[LARPCHEKR] summary fetch failed:", err);
       setSummary(null);
     } finally {
       setSummaryLoading(false);
@@ -265,6 +275,74 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
                     <span className="ml-auto rounded-full bg-red-100 px-3 py-1 text-sm font-bold text-red-700">{summary.flags.length} flag{summary.flags.length !== 1 ? "s" : ""}</span>
                   )}
                 </div>
+
+                {/* ── AI Comparison card ──────────────────────────────── */}
+                {summary.comparison && !summary.comparison.error && (
+                  <div>
+                    <h3 className="mb-2 text-xs font-bold uppercase tracking-widest text-stone-500">Profile Verification</h3>
+                    <div className={`rounded-2xl border p-4 space-y-3 ${
+                      summary.comparison.credibility === "SIGNIFICANT_GAPS"
+                        ? "border-red-200 bg-red-50"
+                        : summary.comparison.credibility === "MINOR_GAPS"
+                        ? "border-amber-200 bg-amber-50"
+                        : "border-emerald-200 bg-emerald-50"
+                    }`}>
+                      {/* Credibility badge */}
+                      <div className="flex items-center gap-2">
+                        <span className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-wide ${
+                          summary.comparison.credibility === "SIGNIFICANT_GAPS"
+                            ? "bg-red-100 text-red-700"
+                            : summary.comparison.credibility === "MINOR_GAPS"
+                            ? "bg-amber-100 text-amber-700"
+                            : "bg-emerald-100 text-emerald-700"
+                        }`}>
+                          {summary.comparison.credibility === "SIGNIFICANT_GAPS" ? "⚠ Significant Gaps"
+                            : summary.comparison.credibility === "MINOR_GAPS" ? "△ Minor Gaps"
+                            : summary.comparison.credibility === "CONSISTENT" ? "✓ Consistent"
+                            : "? Unknown"}
+                        </span>
+                        {summary.comparison.credibility_reason && (
+                          <p className="text-xs text-stone-600 italic">{summary.comparison.credibility_reason}</p>
+                        )}
+                      </div>
+
+                      {/* LinkedIn summary */}
+                      {summary.comparison.linkedin_summary && (
+                        <div>
+                          <p className="text-xs font-bold text-blue-700 mb-1">LinkedIn claims</p>
+                          <p className="text-sm text-stone-800">{summary.comparison.linkedin_summary}</p>
+                        </div>
+                      )}
+
+                      {/* GitHub summary */}
+                      {summary.comparison.github_summary && (
+                        <div>
+                          <p className="text-xs font-bold text-stone-600 mb-1">GitHub evidence</p>
+                          <p className="text-sm text-stone-800">{summary.comparison.github_summary}</p>
+                        </div>
+                      )}
+
+                      {/* Discrepancies */}
+                      {summary.comparison.discrepancies && summary.comparison.discrepancies.length > 0 && (
+                        <div>
+                          <p className="text-xs font-bold text-red-700 mb-1.5">Discrepancies found</p>
+                          <ul className="space-y-1">
+                            {summary.comparison.discrepancies.map((d, i) => (
+                              <li key={i} className="flex items-start gap-1.5 text-sm text-red-900">
+                                <span className="mt-0.5 shrink-0 text-red-400">•</span>
+                                {d}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {summary.comparison.discrepancies?.length === 0 && (
+                        <p className="text-sm text-emerald-700">No discrepancies detected between LinkedIn and GitHub.</p>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* LinkedIn section — scraped via real Chrome session */}
                 {selectedAttendee.linkedin_url ? (
