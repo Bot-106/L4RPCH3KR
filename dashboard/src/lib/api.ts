@@ -38,14 +38,80 @@ export type Attendee = {
   deleted_at?: string | null;
 };
 
+export type Session = {
+  id: string;
+  event_id: string;
+  self_user_id: string | null;
+  wearer_id: string | null;
+  partner_attendee_id: string | null;
+  subject_id: string | null;
+  partner_consent_status: string;
+  started_at: string;
+  ended_at: string | null;
+  pi_device_id: string | null;
+  device_id: string | null;
+  score?: number | null;
+  score_label?: string | null;
+};
+
+export type Utterance = {
+  id: string;
+  session_id: string;
+  speaker: string;
+  speaker_confidence: number;
+  started_at: string;
+  ended_at: string;
+  text: string;
+  transcript: string;
+  audio_url?: string | null;
+  audio_clip_url?: string | null;
+};
+
+export type Claim = {
+  id: string;
+  utterance_id: string;
+  text?: string;
+  claim_text?: string;
+  type?: string;
+  confidence?: number;
+  [key: string]: unknown;
+};
+
+export type Flag = {
+  id: string;
+  session_id?: string;
+  claim_id?: string;
+  subject_id?: string;
+  severity: "low" | "medium" | "high" | string;
+  larp_score_delta?: number;
+  claim_text?: string;
+  verified_text?: string;
+  explanation?: string;
+  created_at?: string | null;
+  [key: string]: unknown;
+};
+
+export type WsEnvelope<T = unknown> = {
+  id: string;
+  type: string;
+  ts: string;
+  session_id?: string | null;
+  data: T;
+};
+
 export type ImportJob = {
   status: "running" | "succeeded" | "failed";
   rows_total: number;
   rows_done: number;
-  errors: Array<{ row?: unknown; message: string }>;
+  errors: Array<{ row_number?: number; row?: unknown; message: string }>;
 };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
+
+export function apiWsUrl(path: string) {
+  const base = API_BASE.replace(/^http/, "ws").replace(/\/$/, "");
+  return `${base}${path}`;
+}
 
 export function getToken() {
   if (typeof window === "undefined") return "";
@@ -61,7 +127,17 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = getToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers, cache: "no-store" });
-  if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+  if (!res.ok) {
+    const text = await res.text();
+    let message: string | undefined;
+    try {
+      const parsed = JSON.parse(text) as { detail?: { error?: { message?: string } } | string };
+      message = typeof parsed.detail === "string" ? parsed.detail : parsed.detail?.error?.message;
+    } catch {
+      message = undefined;
+    }
+    throw new Error(message ? `${res.status} ${message}` : `${res.status} ${text}`);
+  }
   return (await res.json()) as T;
 }
 
@@ -79,6 +155,12 @@ export const api = {
       body: JSON.stringify({ name, starts_at: now.toISOString(), ends_at: ends.toISOString(), consent_jurisdiction: "us-ca", retention_days: 30 })
     });
   },
+  createSession: (eventId: string, deviceId = "browser-laptop") =>
+    request<{ session: Session }>("/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event_id: eventId, device_id: deviceId })
+    }),
   attendees: (eventId: string) => request<{ attendees: Attendee[]; next_cursor: string | null }>(`/events/${eventId}/attendees`),
   importCsv: (eventId: string, file: File) => {
     const form = new FormData();

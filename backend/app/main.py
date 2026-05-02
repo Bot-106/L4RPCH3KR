@@ -2,17 +2,28 @@ import json
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 
+from app import serializers
 from app.config import settings
 from app.db import database
 from app.identity.face_matcher import face_matcher
-from app.pipeline.asr import transcribe_fixture_frame
+from app.pipeline.asr import transcribe_pcm_frame
 from app.pipeline.diarize import classify_speaker
 from app.pipeline.orchestrator import process_simulated_utterance
 from app.routers import router
 from app.ws_manager import envelope, manager
 
 app = FastAPI(title="L4RPCH3KR API", version=settings.version)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://localhost:8000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(router)
 
 
@@ -67,13 +78,21 @@ async def handle_pi_ws(ws: WebSocket, device_token: str | None = None) -> None:
     event_id: str | None = None
     utterance_count = 0
     speaker_hint: str | None = None
+    audio_sample_rate = 16000
+    audio_buffer = bytearray()
     try:
         while True:
             message = await ws.receive()
             if "bytes" in message:
                 if session_id:
+                    audio_buffer.extend(message["bytes"] or b"")
+                    min_chunk_bytes = int(settings.asr_chunk_seconds * audio_sample_rate * 2)
+                    if len(audio_buffer) < min_chunk_bytes:
+                        continue
                     utterance_count += 1
-                    text = transcribe_fixture_frame(utterance_count, message["bytes"] or b"")
+                    chunk = bytes(audio_buffer)
+                    audio_buffer.clear()
+                    text = transcribe_pcm_frame(chunk, sample_rate=audio_sample_rate)
                     if text:
                         speaker, confidence = classify_speaker(speaker_hint)
                         await process_simulated_utterance(database(), session_id, text, speaker, confidence)
@@ -85,26 +104,50 @@ async def handle_pi_ws(ws: WebSocket, device_token: str | None = None) -> None:
             data = payload.get("data") or {}
             if event_type == "audio_meta":
                 speaker_hint = data.get("speaker_hint")
+                audio_sample_rate = int(data.get("sample_rate_hz") or audio_sample_rate)
+            if event_type == "browser_transcript" and session_id:
+                text = str(data.get("text") or "").strip()
+                if text:
+                    speaker, confidence = classify_speaker(data.get("speaker_hint") or speaker_hint)
+                    await process_simulated_utterance(database(), session_id, text, speaker, confidence)
             if event_type == "frame_snapshot" and session_id:
                 session = await database().sessions.find_one({"id": session_id})
                 event_id = data.get("event_id") or (session or {}).get("event_id")
-                embedding = data.get("face_embedding") or ([1.0] + [0.0] * 511 if data.get("image_b64") else None)
+                embedding = data.get("face_embedding") or face_matcher.embedding_from_base64(data.get("image_b64"))
+                identified = False
                 if event_id and embedding:
                     match = await face_matcher.match(database(), event_id, embedding)
                     if match and not match.ambiguous:
+                        attendee = await database().attendees.find_one({"id": match.attendee_id})
                         await database().sessions.update_one({"id": session_id}, {"$set": {"subject_id": match.attendee_id, "partner_attendee_id": match.attendee_id}})
-                        await manager.send_phone(session_id, "subject_identified", {"session_id": session_id, "attendee_id": match.attendee_id, "confidence": match.confidence})
-                        await ws.send_json(envelope("subject_resolved", {"attendee_id": match.attendee_id, "confidence": match.confidence}, session_id))
+                        payload = {"session_id": session_id, "attendee_id": match.attendee_id, "attendee": serializers.attendee(attendee) if attendee else None, "confidence": match.confidence, "method": match.method}
+                        await manager.send_phone(session_id, "subject_identified", payload)
+                        await ws.send_json(envelope("subject_resolved", payload, session_id))
+                        identified = True
                     else:
-                        await ws.send_json(envelope("subject_resolved", {"attendee_id": None, "confidence": 0.0, "requires_name_fallback": True}, session_id))
+                        payload = {"session_id": session_id, "attendee_id": None, "attendee": None, "confidence": 0.0, "method": "profile_picture_similarity", "reason": "no_profile_picture_match"}
+                        await manager.send_phone(session_id, "subject_identified", payload)
+                        await ws.send_json(envelope("subject_resolved", payload, session_id))
+                elif event_id:
+                    await face_matcher.refresh(database(), event_id)
+                    reason = "no_comparable_profile_pictures" if not face_matcher.attendee_ids else "no_face_detected_in_snapshot"
+                    payload = {"session_id": session_id, "attendee_id": None, "attendee": None, "confidence": 0.0, "method": "profile_picture_similarity", "reason": reason}
+                    await manager.send_phone(session_id, "subject_identified", payload)
+                    await ws.send_json(envelope("subject_resolved", payload, session_id))
             if payload.get("session_id"):
                 session_id = payload["session_id"]
             if data.get("session_id"):
                 session_id = data["session_id"]
+            if event_type == "session_end" and session_id and audio_buffer:
+                text = transcribe_pcm_frame(bytes(audio_buffer), sample_rate=audio_sample_rate)
+                audio_buffer.clear()
+                if text:
+                    speaker, confidence = classify_speaker(speaker_hint)
+                    await process_simulated_utterance(database(), session_id, text, speaker, confidence)
             if event_type == "session_start" and session_id:
                 await ws.send_json(envelope("session_ack", {"session_id": session_id}, session_id))
                 await manager.send_phone(session_id, "session_status", {"session_id": session_id, "status": "active", "partner": None})
-            elif event_type in {"pi_hello", "audio_meta", "frame_snapshot", "heartbeat", "buffer_drain_start", "buffer_drain_end", "session_end"}:
+            elif event_type in {"pi_hello", "audio_meta", "browser_transcript", "frame_snapshot", "heartbeat", "buffer_drain_start", "buffer_drain_end", "session_end"}:
                 await ws.send_text(json.dumps(payload))
             else:
                 await ws.send_json(envelope("error", {"code": "unsupported_event_type", "message": f"unsupported event type {event_type}"}, session_id))

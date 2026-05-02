@@ -2,13 +2,14 @@ import csv
 import io
 import secrets
 from datetime import datetime, timedelta
+from typing import Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import Response
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app import serializers
-from app.auth import create_token
+from app.auth import create_token, decode_token
 from app.db import get_db
 from app.deps import current_user, organizer_user
 from app.pipeline.score import compute_score, score_label
@@ -17,7 +18,60 @@ router = APIRouter()
 
 
 def parse_dt(value: str) -> datetime:
-    return datetime.fromisoformat(value.replace("Z", "+00:00")).replace(tzinfo=None)
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).replace(tzinfo=None)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail={"error": {"code": "invalid_date", "message": f"invalid date: {value}"}}) from exc
+
+
+def row_value(row: dict[str, Any], *keys: str) -> str:
+    for key in keys:
+        value = row.get(key)
+        if value is not None and str(value).strip():
+            return str(value).strip()
+    return ""
+
+
+def split_name(row: dict[str, Any]) -> tuple[str, str]:
+    firstname = row_value(row, "firstname", "first_name")
+    lastname = row_value(row, "lastname", "last_name")
+    full_name = row_value(row, "full_name", "name")
+    if (not firstname or not lastname) and full_name:
+        parts = full_name.split()
+        if not firstname and parts:
+            firstname = parts[0]
+        if not lastname and len(parts) > 1:
+            lastname = " ".join(parts[1:])
+    return firstname, lastname
+
+
+def social_links(row: dict[str, Any]) -> dict[str, str | None]:
+    return {
+        "linkedin": row_value(row, "linkedin", "linkedin_url") or None,
+        "github": row_value(row, "github", "github_login") or None,
+        "instagram": row_value(row, "instagram") or None,
+        "website": row_value(row, "website", "personal_site") or None,
+    }
+
+
+async def require_event(db: AsyncIOMotorDatabase, event_id: str) -> dict:
+    event = await db.events.find_one({"id": event_id})
+    if event is None:
+        raise HTTPException(status_code=404, detail={"error": {"code": "event_not_found", "message": "event not found"}})
+    return event
+
+
+async def user_from_export_token(db: AsyncIOMotorDatabase, token: str | None) -> dict:
+    if not token:
+        raise HTTPException(status_code=401, detail={"error": {"code": "auth_invalid", "message": "missing export token"}})
+    try:
+        payload = decode_token(token)
+    except Exception as exc:
+        raise HTTPException(status_code=401, detail={"error": {"code": "auth_invalid", "message": "invalid export token"}}) from exc
+    user = await db.users.find_one({"id": payload["sub"]})
+    if not user:
+        raise HTTPException(status_code=401, detail={"error": {"code": "auth_invalid", "message": "unknown user"}})
+    return user
 
 
 @router.post("/auth/magic-link", status_code=202)
@@ -163,9 +217,14 @@ async def dispute_flag(flag_id: str, payload: dict, db: AsyncIOMotorDatabase = D
 
 @router.post("/events", status_code=201)
 async def create_event(payload: dict, user: dict = Depends(organizer_user), db: AsyncIOMotorDatabase = Depends(get_db)) -> dict:
+    name = str(payload.get("name", "")).strip()
+    if not name:
+        raise HTTPException(status_code=422, detail={"error": {"code": "invalid_event", "message": "event name is required"}})
     start_date = parse_dt(payload.get("start_date") or payload.get("starts_at") or datetime.utcnow().isoformat())
     end_date = parse_dt(payload.get("end_date") or payload.get("ends_at") or (datetime.utcnow() + timedelta(days=1)).isoformat())
-    event = {"id": serializers.new_id(), "name": payload["name"], "start_date": start_date, "end_date": end_date, "starts_at": start_date, "ends_at": end_date, "organizer_ids": [user["id"]], "created_by_user_id": user["id"], "consent_jurisdiction": payload.get("consent_jurisdiction", "us-ca"), "retention_days": payload.get("retention_days", 30)}
+    if end_date <= start_date:
+        raise HTTPException(status_code=422, detail={"error": {"code": "invalid_event", "message": "event end date must be after start date"}})
+    event = {"id": serializers.new_id(), "name": name, "start_date": start_date, "end_date": end_date, "starts_at": start_date, "ends_at": end_date, "organizer_ids": [user["id"]], "created_by_user_id": user["id"], "consent_jurisdiction": payload.get("consent_jurisdiction", "us-ca"), "retention_days": payload.get("retention_days", 30)}
     await db.events.insert_one(event)
     return {"event": serializers.event(event)}
 
@@ -178,25 +237,29 @@ async def list_events(db: AsyncIOMotorDatabase = Depends(get_db), _: dict = Depe
 
 @router.get("/events/{event_id}")
 async def get_event(event_id: str, db: AsyncIOMotorDatabase = Depends(get_db), _: dict = Depends(current_user)) -> dict:
-    event = await db.events.find_one({"id": event_id})
+    event = await require_event(db, event_id)
     count = await db.attendees.count_documents({"event_id": event_id, "deleted_at": None})
-    return {"event": serializers.event(event, count) if event else None}
+    return {"event": serializers.event(event, count)}
 
 
 @router.post("/events/{event_id}/attendees/import", status_code=202)
 async def import_attendees(event_id: str, csv_file: UploadFile = File(alias="csv"), db: AsyncIOMotorDatabase = Depends(get_db), _: dict = Depends(organizer_user)) -> dict:
-    rows = list(csv.DictReader(io.StringIO((await csv_file.read()).decode("utf-8-sig"))))
+    await require_event(db, event_id)
+    try:
+        rows = list(csv.DictReader(io.StringIO((await csv_file.read()).decode("utf-8-sig"))))
+    except UnicodeDecodeError as exc:
+        raise HTTPException(status_code=422, detail={"error": {"code": "invalid_csv", "message": "CSV must be UTF-8 encoded"}}) from exc
     errors = []
     attendees = []
-    for row in rows:
-        firstname = row.get("firstname") or (row.get("full_name", "").split(" ")[0] if row.get("full_name") else "")
-        lastname = row.get("lastname") or (row.get("full_name", "").split(" ")[-1] if row.get("full_name") else "")
+    for index, row in enumerate(rows, start=2):
+        firstname, lastname = split_name(row)
         if not firstname or not lastname:
-            errors.append({"row": row, "message": "missing firstname/lastname"})
+            errors.append({"row_number": index, "row": row, "message": "missing firstname/lastname"})
             continue
-        socials = {"linkedin": row.get("linkedin") or row.get("linkedin_url") or None, "github": row.get("github") or row.get("github_login") or None, "instagram": row.get("instagram") or None, "website": row.get("website") or row.get("personal_site") or None}
+        socials = social_links(row)
         embedding = [1.0] + [0.0] * 511
-        attendees.append({"id": serializers.new_id(), "event_id": event_id, "user_id": None, "firstname": firstname, "lastname": lastname, "full_name": f"{firstname} {lastname}", "email": row.get("email", ""), "socials": socials, "headline": row.get("headline") or None, "linkedin_url": socials["linkedin"], "github_login": socials["github"], "profile_pic_url": row.get("profile_pic_url") or None, "photo_url": row.get("profile_pic_url") or None, "face_embedding": embedding, "verified_profile": {"languages": [{"name": "python", "evidence": "github", "confidence": 0.9, "loc": 12000}]}, "larp_score": None, "opt_in": {"public": True, "friends": True, "private": False}, "processing_status": "ready", "consented_to_recording": True, "imported_at": datetime.utcnow(), "deleted_at": None})
+        profile_pic_url = row_value(row, "profile_pic_url", "photo_url") or None
+        attendees.append({"id": serializers.new_id(), "event_id": event_id, "user_id": None, "firstname": firstname, "lastname": lastname, "full_name": f"{firstname} {lastname}", "email": row_value(row, "email"), "socials": socials, "headline": row_value(row, "headline") or None, "linkedin_url": socials["linkedin"], "github_login": socials["github"], "resume_url": row_value(row, "resume_url") or None, "profile_pic_url": profile_pic_url, "photo_url": profile_pic_url, "face_embedding": embedding, "verified_profile": {"languages": [{"name": "python", "evidence": "github", "confidence": 0.9, "loc": 12000}]}, "larp_score": None, "opt_in": {"public": True, "friends": True, "private": False}, "processing_status": "ready", "consented_to_recording": True, "imported_at": datetime.utcnow(), "deleted_at": None})
     if attendees:
         await db.attendees.insert_many(attendees)
     job = {"id": serializers.new_id(), "event_id": event_id, "status": "succeeded", "rows_total": len(rows), "rows_done": len(rows), "errors": errors}
@@ -207,18 +270,27 @@ async def import_attendees(event_id: str, csv_file: UploadFile = File(alias="csv
 @router.get("/events/{event_id}/attendees/import/{job_id}")
 async def import_status(event_id: str, job_id: str, db: AsyncIOMotorDatabase = Depends(get_db), _: dict = Depends(current_user)) -> dict:
     job = await db.import_jobs.find_one({"id": job_id, "event_id": event_id})
+    if job is None:
+        raise HTTPException(status_code=404, detail={"error": {"code": "import_job_not_found", "message": "import job not found"}})
     return {"status": job["status"], "rows_total": job["rows_total"], "rows_done": job["rows_done"], "errors": job["errors"]}
 
 
 @router.get("/events/{event_id}/attendees")
 async def list_attendees(event_id: str, limit: int = 50, cursor: str | None = None, db: AsyncIOMotorDatabase = Depends(get_db), _: dict = Depends(current_user)) -> dict:
+    await require_event(db, event_id)
+    limit = min(max(limit, 1), 200)
     rows = await db.attendees.find({"event_id": event_id, "deleted_at": None}).sort("full_name", 1).limit(limit).to_list(limit)
     return {"attendees": [serializers.attendee(a) for a in rows], "next_cursor": None}
 
 
+@router.get("/events/{event_id}/attendees/export")
+async def export_attendees(event_id: str, token: str | None = None, db: AsyncIOMotorDatabase = Depends(get_db)) -> Response:
+    return await export_event(event_id, token, db)
+
+
 @router.get("/events/{event_id}/attendees/{attendee_id}")
 async def attendee_detail(event_id: str, attendee_id: str, db: AsyncIOMotorDatabase = Depends(get_db), _: dict = Depends(current_user)) -> dict:
-    attendee = await db.attendees.find_one({"id": attendee_id, "event_id": event_id})
+    attendee = await db.attendees.find_one({"id": attendee_id, "event_id": event_id, "deleted_at": None})
     if attendee is None:
         raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "attendee not found"}})
     flags = await db.flags.find({"subject_id": attendee_id}).sort("created_at", -1).to_list(100)
@@ -227,8 +299,10 @@ async def attendee_detail(event_id: str, attendee_id: str, db: AsyncIOMotorDatab
 
 @router.post("/events/{event_id}/attendees", status_code=201)
 async def create_attendee(event_id: str, payload: dict, db: AsyncIOMotorDatabase = Depends(get_db), _: dict = Depends(organizer_user)) -> dict:
-    firstname = payload.get("firstname") or payload.get("full_name", "").split(" ")[0]
-    lastname = payload.get("lastname") or payload.get("full_name", "").split(" ")[-1]
+    await require_event(db, event_id)
+    firstname, lastname = split_name(payload)
+    if not firstname or not lastname:
+        raise HTTPException(status_code=422, detail={"error": {"code": "invalid_attendee", "message": "firstname and lastname are required"}})
     attendee = {"id": serializers.new_id(), "event_id": event_id, "user_id": None, "firstname": firstname, "lastname": lastname, "full_name": f"{firstname} {lastname}", "email": payload.get("email", ""), "socials": payload.get("socials", {}), "headline": payload.get("headline"), "linkedin_url": payload.get("linkedin_url"), "github_login": payload.get("github_login"), "resume_url": payload.get("resume_url"), "photo_url": payload.get("photo_url"), "profile_pic_url": payload.get("profile_pic_url") or payload.get("photo_url"), "face_embedding": payload.get("face_embedding") or [1.0] + [0.0] * 511, "verified_profile": payload.get("verified_profile", {}), "larp_score": None, "processing_status": "ready", "opt_in": {"public": True, "friends": True, "private": False}, "consented_to_recording": payload.get("consented_to_recording", True), "imported_at": datetime.utcnow(), "deleted_at": None}
     await db.attendees.insert_one(attendee)
     return {"attendee": serializers.attendee(attendee)}
@@ -236,7 +310,28 @@ async def create_attendee(event_id: str, payload: dict, db: AsyncIOMotorDatabase
 
 @router.patch("/events/{event_id}/attendees/{attendee_id}")
 async def update_attendee(event_id: str, attendee_id: str, payload: dict, db: AsyncIOMotorDatabase = Depends(get_db), _: dict = Depends(organizer_user)) -> dict:
+    attendee = await db.attendees.find_one({"id": attendee_id, "event_id": event_id, "deleted_at": None})
+    if attendee is None:
+        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "attendee not found"}})
     update = {field: payload[field] for field in ["headline", "linkedin_url", "github_login", "resume_url", "full_name", "email", "firstname", "lastname", "socials", "profile_pic_url", "processing_status"] if field in payload}
+    if not update:
+        raise HTTPException(status_code=422, detail={"error": {"code": "invalid_attendee", "message": "no supported fields provided"}})
+    if "firstname" in update or "lastname" in update:
+        firstname = update.get("firstname") or attendee.get("firstname", "")
+        lastname = update.get("lastname") or attendee.get("lastname", "")
+        update["full_name"] = f"{firstname} {lastname}".strip()
+    if "full_name" in update and ("firstname" not in update or "lastname" not in update):
+        firstname, lastname = split_name({"full_name": update["full_name"]})
+        if firstname and lastname:
+            update.setdefault("firstname", firstname)
+            update.setdefault("lastname", lastname)
+    socials = dict(attendee.get("socials") or {})
+    if "github_login" in update:
+        socials["github"] = update["github_login"] or None
+        update["socials"] = socials
+    if "linkedin_url" in update:
+        socials["linkedin"] = update["linkedin_url"] or None
+        update["socials"] = socials
     await db.attendees.update_one({"id": attendee_id, "event_id": event_id}, {"$set": update})
     attendee = await db.attendees.find_one({"id": attendee_id})
     return {"attendee": serializers.attendee(attendee)}
@@ -244,34 +339,35 @@ async def update_attendee(event_id: str, attendee_id: str, payload: dict, db: As
 
 @router.delete("/events/{event_id}/attendees/{attendee_id}")
 async def delete_attendee(event_id: str, attendee_id: str, db: AsyncIOMotorDatabase = Depends(get_db), _: dict = Depends(organizer_user)) -> dict:
+    attendee = await db.attendees.find_one({"id": attendee_id, "event_id": event_id, "deleted_at": None})
+    if attendee is None:
+        raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "attendee not found"}})
     await db.attendees.update_one({"id": attendee_id, "event_id": event_id}, {"$set": {"deleted_at": datetime.utcnow()}})
     attendee = await db.attendees.find_one({"id": attendee_id})
     return {"attendee": serializers.attendee(attendee)}
 
 
-@router.get("/events/{event_id}/attendees/export")
-async def export_attendees(event_id: str, db: AsyncIOMotorDatabase = Depends(get_db)) -> Response:
-    return await export_event(event_id, db)
-
-
 @router.get("/events/{event_id}/export")
-async def export_event(event_id: str, db: AsyncIOMotorDatabase = Depends(get_db)) -> Response:
+async def export_event(event_id: str, token: str | None = None, db: AsyncIOMotorDatabase = Depends(get_db)) -> Response:
+    await user_from_export_token(db, token)
+    await require_event(db, event_id)
     rows = await db.attendees.find({"event_id": event_id, "deleted_at": None}).sort("full_name", 1).to_list(None)
     out = io.StringIO()
-    writer = csv.DictWriter(out, fieldnames=["firstname", "lastname", "linkedin", "github", "instagram", "website", "larp_score", "processing_status", "profile_pic_url"])
+    writer = csv.DictWriter(out, fieldnames=["firstname", "lastname", "email", "headline", "linkedin", "github", "instagram", "website", "larp_score", "processing_status", "profile_pic_url"])
     writer.writeheader()
     for a in rows:
         socials = a.get("socials") or {}
-        writer.writerow({"firstname": a.get("firstname"), "lastname": a.get("lastname"), "linkedin": socials.get("linkedin"), "github": socials.get("github"), "instagram": socials.get("instagram"), "website": socials.get("website"), "larp_score": a.get("larp_score"), "processing_status": a.get("processing_status"), "profile_pic_url": a.get("profile_pic_url")})
-    return Response(out.getvalue(), media_type="text/csv")
+        writer.writerow({"firstname": a.get("firstname"), "lastname": a.get("lastname"), "email": a.get("email"), "headline": a.get("headline"), "linkedin": socials.get("linkedin") or a.get("linkedin_url"), "github": socials.get("github") or a.get("github_login"), "instagram": socials.get("instagram"), "website": socials.get("website"), "larp_score": a.get("larp_score"), "processing_status": a.get("processing_status"), "profile_pic_url": a.get("profile_pic_url")})
+    return Response(out.getvalue(), media_type="text/csv", headers={"Content-Disposition": f'attachment; filename="{event_id}-attendees.csv"'})
 
 
 @router.get("/events/{event_id}/stats")
 async def event_stats(event_id: str, db: AsyncIOMotorDatabase = Depends(get_db), _: dict = Depends(current_user)) -> dict:
+    await require_event(db, event_id)
     attendee_count = await db.attendees.count_documents({"event_id": event_id, "deleted_at": None})
     registered = await db.attendees.count_documents({"event_id": event_id, "user_id": {"$ne": None}, "deleted_at": None})
-    attendee_ids = [a["id"] for a in await db.attendees.find({"event_id": event_id}).to_list(None)]
+    attendee_ids = [a["id"] for a in await db.attendees.find({"event_id": event_id, "deleted_at": None}).to_list(None)]
     flags = await db.flags.find({"subject_id": {"$in": attendee_ids}}).sort("created_at", -1).to_list(None)
-    scored = [a for a in await db.attendees.find({"event_id": event_id, "larp_score": {"$ne": None}}).to_list(None)]
+    scored = [a for a in await db.attendees.find({"event_id": event_id, "larp_score": {"$ne": None}, "deleted_at": None}).to_list(None)]
     avg_score = sum(a.get("larp_score", 0) for a in scored) / len(scored) if scored else 0
     return {"attendees": attendee_count, "avg_score": avg_score, "flags": len(flags), "registered": registered, "latest_flag": serializers.flag(flags[0]) if flags else None}
