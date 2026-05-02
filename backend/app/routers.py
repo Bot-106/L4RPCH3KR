@@ -490,12 +490,15 @@ async def attendee_summary(event_id: str, attendee_id: str, refresh: bool = Fals
         raise HTTPException(status_code=404, detail={"error": {"code": "not_found", "message": "attendee not found"}})
 
     dynamic = await attendee_summary_dynamic_fields(db, attendee, attendee_id)
+    # Live eval score — written by holistic transcript evaluation, always wins if higher
+    live_score = float(attendee.get("larp_score") or 0.0)
     cached_summary = attendee.get("profile_summary") or {}
     if cached_summary and not refresh and cached_summary.get("larp_score") is not None:
-        profile_score = cached_summary.get("larp_score")
+        profile_score = float(cached_summary.get("larp_score") or 0.0)
+        combined_score = max(profile_score, live_score)
         profile_label = cached_summary.get("profile_larp_label")
-        if not profile_label and isinstance(profile_score, int | float):
-            profile_label = score_label(profile_score)
+        if not profile_label and isinstance(combined_score, int | float):
+            profile_label = score_label(combined_score)
         return {
             "attendee": serializers.attendee(attendee),
             "github": cached_summary.get("github") or {},
@@ -503,7 +506,7 @@ async def attendee_summary(event_id: str, attendee_id: str, refresh: bool = Fals
             "comparison": cached_summary.get("comparison") or {},
             "verified_profile": dynamic["verified_profile"],
             "flags": [serializers.flag(f) for f in dynamic["flags"]],
-            "larp_score": profile_score,
+            "larp_score": combined_score,
             "profile_larp_score": profile_score,
             "profile_larp_label": profile_label,
             "dot_jots": dynamic["dot_jots"],
@@ -783,7 +786,7 @@ Tasks — respond ONLY with a single JSON object, no markdown fences:
         "comparison": comparison,
         "verified_profile": verified_profile,
         "flags": [serializers.flag(f) for f in flags],
-        "larp_score": profile_score,
+        "larp_score": max(profile_score, live_score),
         "profile_larp_score": profile_score,
         "profile_larp_label": profile_label,
         "dot_jots": dynamic["dot_jots"],

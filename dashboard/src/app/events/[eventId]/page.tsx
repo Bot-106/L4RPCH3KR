@@ -202,9 +202,15 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
       } else if (env.type === "score_update" && typeof env.data.score === "number" && env.data.subject_id) {
         const subjectId = String(env.data.subject_id);
         const newScore = Number(env.data.score);
+        const newLabel = typeof env.data.label === "string" ? env.data.label : undefined;
         setAttendees((rows) => rows.map((a) => a.id === subjectId ? { ...a, larp_score: newScore } : a));
         if (selectedAttendeeRef.current?.id === subjectId) {
-          setSummary((s) => s ? { ...s, larp_score: newScore, attendee: { ...s.attendee, larp_score: newScore } } : s);
+          setSummary((s) => s ? {
+            ...s,
+            larp_score: Math.max(newScore, s.larp_score ?? 0),
+            profile_larp_label: newLabel ?? s.profile_larp_label,
+            attendee: { ...s.attendee, larp_score: newScore },
+          } : s);
         }
       } else if (env.type === "flag_raised" && env.data.flag) {
         const flag = env.data.flag as Flag;
