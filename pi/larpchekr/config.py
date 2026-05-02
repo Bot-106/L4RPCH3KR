@@ -22,6 +22,7 @@ class Settings:
     device_id: str
     log_level: str
     fake_hardware: bool
+    preview_port: int
 
     def __init__(self) -> None:
         self.backend_ws = os.environ.get(
@@ -36,6 +37,7 @@ class Settings:
         self.device_id = os.environ.get("LARPCHEKR_DEVICE_ID", "rpi-dev-001")
         self.log_level = os.environ.get("LARPCHEKR_LOG_LEVEL", "info").upper()
         self.fake_hardware = _bool(os.environ.get("LARPCHEKR_FAKE_HARDWARE"), False)
+        self.preview_port = int(os.environ.get("LARPCHEKR_PREVIEW_PORT", "8080"))
 
     @property
     def pi_token(self) -> str:

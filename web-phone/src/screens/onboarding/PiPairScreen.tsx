@@ -6,14 +6,22 @@ import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { initPiPair } from '@/lib/api'
 import { colors } from '@/theme/tokens'
 
+const DEV_PAIR_TOKEN = 'dev-pi'
+
 export function PiPairScreen() {
   const navigate = useNavigate()
-  const [pairToken, setPairToken] = useState<string | null>(null)
+  const [pairToken, setPairToken] = useState<string | null>(
+    import.meta.env.DEV ? DEV_PAIR_TOKEN : null
+  )
   const [expiresAt, setExpiresAt] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!import.meta.env.DEV)
   const [error, setError] = useState('')
 
   async function fetchPairToken() {
+    if (import.meta.env.DEV) {
+      setPairToken(DEV_PAIR_TOKEN)
+      return
+    }
     setError('')
     setLoading(true)
     try {
@@ -28,7 +36,7 @@ export function PiPairScreen() {
   }
 
   useEffect(() => {
-    void fetchPairToken()
+    if (!import.meta.env.DEV) void fetchPairToken()
   }, [])
 
   const expired = expiresAt ? new Date(expiresAt) < new Date() : false
@@ -72,6 +80,11 @@ export function PiPairScreen() {
                     bgColor="#ffffff"
                     fgColor={colors.bg.canvas}
                   />
+                  {import.meta.env.DEV && (
+                    <p className="text-xs text-center mt-2 text-text-muted font-mono">
+                      DEV — token: {DEV_PAIR_TOKEN}
+                    </p>
+                  )}
                 )}
               </div>
               {expiresAt && !expired && (

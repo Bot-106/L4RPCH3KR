@@ -24,6 +24,7 @@ MAX_HEIGHT = 480
 JPEG_QUALITY = 75
 
 SendEnvelopeFn = Callable[[dict], Awaitable[None]]
+FrameCallback = Callable[[bytes], None]
 
 
 def _make_snapshot_envelope(
@@ -123,6 +124,37 @@ class CameraCapture:
                 log.debug("camera: snapshot sent (%dx%d)", w, h)
             except Exception as exc:
                 log.error("camera: snapshot error: %s", exc)
+
+    def _capture_jpeg_sync(self) -> bytes | None:
+        """Blocking capture — call via run_in_executor from async context."""
+        try:
+            if self._fake:
+                frame = _make_fake_frame()
+            else:
+                ok, frame = self._cap.read()  # type: ignore[union-attr]
+                if not ok:
+                    frame = _make_fake_frame()
+            jpeg_bytes, _, _ = _encode_jpeg(frame)
+            return jpeg_bytes
+        except Exception as exc:
+            log.warning("camera: preview capture failed: %s", exc)
+            return None
+
+    async def preview_run(
+        self,
+        on_frame: FrameCallback,
+        stop_event: asyncio.Event,
+        fps: int = 2,
+    ) -> None:
+        """Capture continuously at `fps` and push JPEG bytes to on_frame."""
+        interval = 1.0 / fps
+        loop = asyncio.get_running_loop()
+        log.info("camera: preview loop started (%d fps, fake=%s)", fps, self._fake)
+        while not stop_event.is_set():
+            jpeg = await loop.run_in_executor(None, self._capture_jpeg_sync)
+            if jpeg:
+                on_frame(jpeg)
+            await asyncio.sleep(interval)
 
     def close(self) -> None:
         if self._cap is not None:

@@ -27,6 +27,7 @@ from larpchekr.hardware.button import Button
 from larpchekr.hardware.haptic import HapticDriver
 from larpchekr.hardware.led import LEDController, LedState
 from larpchekr.pairing import PairingManager
+from larpchekr.preview_server import PreviewServer
 from larpchekr.ws_client import WsClient
 
 log = logging.getLogger(__name__)
@@ -92,6 +93,7 @@ async def main() -> None:
     # --- Subsystems ---
     audio = AudioCapture(fake=fake)
     camera = CameraCapture(fake=fake)
+    preview = PreviewServer(host="0.0.0.0", port=settings.preview_port)
 
     ws = WsClient(
         ws_url=settings.backend_ws,
@@ -131,6 +133,14 @@ async def main() -> None:
                 stop_event=stop_event,
             ),
             name="camera",
+        ),
+        asyncio.create_task(
+            camera.preview_run(on_frame=preview.update_frame, stop_event=stop_event),
+            name="camera_preview",
+        ),
+        asyncio.create_task(
+            preview.run(stop_event=stop_event),
+            name="preview_server",
         ),
         asyncio.create_task(
             ws.heartbeat_loop(get_buffer_seconds=lambda: buf.buffered_seconds),
