@@ -5,6 +5,7 @@ import json
 import logging
 import time
 from asyncio import StreamReader, StreamWriter
+from collections import deque
 from collections.abc import Callable
 
 log = logging.getLogger(__name__)
@@ -152,9 +153,23 @@ class PreviewServer:
         self._queues: list[asyncio.Queue[bytes]] = []
         self._face_detected: bool = False
         self._last_transcript: str = ""
+        self._face_log: deque[tuple[float, bool]] = deque()
 
     def set_face_detected(self, detected: bool) -> None:
         self._face_detected = detected
+        now = time.monotonic()
+        self._face_log.append((now, detected))
+        cutoff = now - 60.0
+        while self._face_log and self._face_log[0][0] < cutoff:
+            self._face_log.popleft()
+
+    def face_ratio(self, window_s: float = 10.0) -> float:
+        """Fraction of detection frames in the last window_s seconds where face was present."""
+        cutoff = time.monotonic() - window_s
+        recent = [v for t, v in self._face_log if t >= cutoff]
+        if not recent:
+            return 0.0
+        return sum(recent) / len(recent)
 
     def set_last_transcript(self, text: str) -> None:
         self._last_transcript = text

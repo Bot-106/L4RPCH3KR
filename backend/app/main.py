@@ -188,10 +188,11 @@ async def handle_pi_ws(ws: WebSocket, token: str | None = None) -> None:
                     log.warning('{"event": "browser_transcript_no_session", "text_preview": "%s", "request_id": "%s"}', text[:80], request_id)
                 elif text:
                     speaker, confidence = classify_speaker(speaker_from_hint)
-                    log.warning('{"event": "browser_transcript", "speaker": "%s", "confidence": %f, "text_len": %d, "text_preview": "%s", "session_id": "%s", "request_id": "%s"}',
-                        speaker, confidence, len(text), text[:80], session_id, request_id)
+                    face_ratio = float(data.get("face_ratio") or 1.0)
+                    log.warning('{"event": "browser_transcript", "speaker": "%s", "confidence": %f, "face_ratio": %.2f, "text_len": %d, "text_preview": "%s", "session_id": "%s", "request_id": "%s"}',
+                        speaker, confidence, face_ratio, len(text), text[:80], session_id, request_id)
                     try:
-                        await process_simulated_utterance(database(), session_id, text, speaker, confidence)
+                        await process_simulated_utterance(database(), session_id, text, speaker, confidence, face_ratio)
                         print(f"[TRANSCRIPT] process_simulated_utterance OK session_id={session_id}", flush=True)
                     except Exception as exc:
                         log.exception('{"event": "browser_transcript_pipeline_error", "session_id": "%s", "request_id": "%s", "error": "%s"}', session_id, request_id, str(exc))

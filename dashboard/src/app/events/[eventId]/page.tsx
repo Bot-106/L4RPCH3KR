@@ -585,6 +585,25 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
                   </div>
                 ) : null}
 
+                {/* Live observations (dot-jots from Pi audio) */}
+                {summary.dot_jots && summary.dot_jots.length > 0 && (
+                  <div>
+                    <h3 className="mb-2 text-xs font-bold uppercase tracking-widest text-stone-500">
+                      What they said · live observations
+                    </h3>
+                    <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4">
+                      <ul className="space-y-1.5">
+                        {summary.dot_jots.map((note, i) => (
+                          <li key={i} className="flex items-start gap-2 text-sm">
+                            <span className="mt-0.5 shrink-0 font-bold text-violet-400">·</span>
+                            <span className="text-violet-900">{note}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                )}
+
                 {/* Flags */}
                 {summary.flags.length > 0 && (
                   <div>

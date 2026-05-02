@@ -155,6 +155,7 @@ export type AttendeeSummary = {
   larp_score?: number | null;
   profile_larp_score?: number | null;
   profile_larp_label?: string | null;
+  dot_jots?: string[];
 };
 
 export type LeaderboardEntry = {

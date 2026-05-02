@@ -53,7 +53,7 @@ SendEnvelopeFn = Callable[[dict], Awaitable[None]]
 TranscriptCallback = Callable[[str], None]
 
 
-def _make_browser_transcript_envelope(text: str, session_id: str | None) -> dict:
+def _make_browser_transcript_envelope(text: str, session_id: str | None, face_ratio: float = 1.0) -> dict:
     import uuid
     from datetime import datetime
     return {
@@ -63,7 +63,8 @@ def _make_browser_transcript_envelope(text: str, session_id: str | None) -> dict
         "session_id": session_id,
         "data": {
             "text": text,
-            "speaker_hint": "self",
+            "speaker_hint": "subject",
+            "face_ratio": round(face_ratio, 3),
             "session_id": session_id,
         },
     }
@@ -110,15 +111,16 @@ class AudioCapture:
         get_session_id: Callable[[], str | None],
         stop_event: asyncio.Event,
         on_transcript: TranscriptCallback | None = None,
+        get_face_ratio: Callable[[], float] | None = None,
     ) -> None:
         if self._fake:
             await self._run_fake(send_envelope, get_session_id, stop_event, on_transcript)
         else:
-            await self._run_real(send_envelope, get_session_id, stop_event, on_transcript)
+            await self._run_real(send_envelope, get_session_id, stop_event, on_transcript, get_face_ratio)
 
     # ------------------------------------------------------------------
-    # Fake mode — emit pre-written transcript phrases on a timer so the
-    # WS round-trip can be exercised without hardware or STT.
+    # Fake mode — emit pre-written transcript phrases on a timer.
+    # Face gate is bypassed in fake mode so tests always flow through.
     # ------------------------------------------------------------------
     async def _run_fake(
         self,
@@ -141,11 +143,12 @@ class AudioCapture:
             log.debug("audio: fake transcript → %s", text[:60])
             if on_transcript:
                 on_transcript(text)
-            await send_envelope(_make_browser_transcript_envelope(text, session_id))
+            await send_envelope(_make_browser_transcript_envelope(text, session_id, face_ratio=1.0))
 
     # ------------------------------------------------------------------
     # Real mode — sounddevice callback fills an asyncio queue; on speech
     # end, accumulated PCM is transcribed locally and sent as text.
+    # Only sends when face has been detected ≥70% of the 10s window.
     # ------------------------------------------------------------------
     async def _run_real(
         self,
@@ -153,6 +156,7 @@ class AudioCapture:
         get_session_id: Callable[[], str | None],
         stop_event: asyncio.Event,
         on_transcript: TranscriptCallback | None = None,
+        get_face_ratio: Callable[[], float] | None = None,
     ) -> None:
         try:
             import numpy as np  # type: ignore[import]
@@ -226,12 +230,16 @@ class AudioCapture:
                             log.warning("audio: transcription timed out — skipping segment")
                             text = None
                         if text:
-                            log.info("audio: transcript → %s", text[:80])
-                            if on_transcript:
-                                on_transcript(text)
-                            await send_envelope(
-                                _make_browser_transcript_envelope(text, session_id)
-                            )
+                            ratio = get_face_ratio() if get_face_ratio else 1.0
+                            if ratio < 0.70:
+                                log.info("audio: skip transcript (face_ratio=%.2f < 0.70) preview=%s", ratio, text[:40])
+                            else:
+                                log.info("audio: transcript → %s (face_ratio=%.2f)", text[:80], ratio)
+                                if on_transcript:
+                                    on_transcript(text)
+                                await send_envelope(
+                                    _make_browser_transcript_envelope(text, session_id, ratio)
+                                )
                         else:
                             log.debug("audio: transcription returned empty")
                 else:
@@ -256,12 +264,16 @@ class AudioCapture:
                                 log.warning("audio: transcription timed out — skipping segment")
                                 text = None
                             if text:
-                                log.info("audio: transcript → %s", text[:80])
-                                if on_transcript:
-                                    on_transcript(text)
-                                await send_envelope(
-                                    _make_browser_transcript_envelope(text, session_id)
-                                )
+                                ratio = get_face_ratio() if get_face_ratio else 1.0
+                                if ratio < 0.70:
+                                    log.info("audio: skip transcript (face_ratio=%.2f < 0.70) preview=%s", ratio, text[:40])
+                                else:
+                                    log.info("audio: transcript → %s (face_ratio=%.2f)", text[:80], ratio)
+                                    if on_transcript:
+                                        on_transcript(text)
+                                    await send_envelope(
+                                        _make_browser_transcript_envelope(text, session_id, ratio)
+                                    )
                             else:
                                 log.debug("audio: transcription returned empty")
                         speaking = False

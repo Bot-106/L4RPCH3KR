@@ -106,6 +106,7 @@ def session(s: dict[str, Any]) -> dict[str, Any]:
         "device_id": s.get("device_id") or s.get("pi_device_id"),
         "score": s.get("score"),
         "score_label": s.get("score_label"),
+        "dot_jots": s.get("dot_jots") or [],
     }
 
 
