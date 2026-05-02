@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://larpchekr.app/schemas/claim.schema.json",
+  "title": "Claim",
+  "type": "object",
+  "required": ["id", "utterance_id", "kind", "subject", "predicate", "value", "hedge", "extraction_confidence", "text_span"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "$ref": "_common.schema.json#/$defs/Ulid" },
+    "utterance_id": { "$ref": "_common.schema.json#/$defs/Ulid" },
+    "kind": {
+      "type": "string",
+      "enum": ["language_experience", "employment", "education", "project", "credential", "quantitative"]
+    },
+    "subject": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "predicate": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "value": {
+      "description": "Shape depends on `kind`. See examples below.",
+      "oneOf": [
+        {
+          "title": "language_experience.value",
+          "type": "object",
+          "required": ["years"],
+          "properties": {
+            "years": { "type": "number", "minimum": 0, "maximum": 60 },
+            "shipping_prod": { "type": "boolean" }
+          }
+        },
+        {
+          "title": "employment.value",
+          "type": "object",
+          "required": ["company"],
+          "properties": {
+            "company": { "type": "string" },
+            "title": { "type": "string" },
+            "start_year": { "type": "integer" },
+            "end_year": { "type": ["integer", "null"] }
+          }
+        },
+        {
+          "title": "education.value",
+          "type": "object",
+          "required": ["school"],
+          "properties": {
+            "school": { "type": "string" },
+            "degree": { "type": "string" },
+            "field": { "type": "string" },
+            "graduation_year": { "type": ["integer", "null"] }
+          }
+        },
+        {
+          "title": "project.value",
+          "type": "object",
+          "required": ["name"],
+          "properties": {
+            "name": { "type": "string" },
+            "url": { "type": ["string", "null"], "format": "uri" },
+            "stars_claimed": { "type": ["integer", "null"] }
+          }
+        },
+        {
+          "title": "credential.value",
+          "type": "object",
+          "required": ["credential"],
+          "properties": {
+            "credential": { "type": "string" },
+            "issuer": { "type": ["string", "null"] }
+          }
+        },
+        {
+          "title": "quantitative.value",
+          "type": "object",
+          "required": ["metric", "amount"],
+          "properties": {
+            "metric": { "type": "string" },
+            "amount": { "type": "number" },
+            "unit": { "type": ["string", "null"] }
+          }
+        }
+      ]
+    },
+    "hedge": { "$ref": "_common.schema.json#/$defs/Hedge" },
+    "extraction_confidence": { "$ref": "_common.schema.json#/$defs/Confidence" },
+    "text_span": { "type": "string", "minLength": 1 }
+  }
+}

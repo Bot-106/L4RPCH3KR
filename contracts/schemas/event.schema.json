@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://larpchekr.app/schemas/event.schema.json",
+  "title": "Event",
+  "type": "object",
+  "required": ["id", "name", "starts_at", "ends_at", "consent_jurisdiction", "retention_days", "created_by_user_id"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "$ref": "_common.schema.json#/$defs/Ulid" },
+    "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "starts_at": { "$ref": "_common.schema.json#/$defs/IsoTimestamp" },
+    "ends_at": { "$ref": "_common.schema.json#/$defs/IsoTimestamp" },
+    "consent_jurisdiction": {
+      "type": "string",
+      "description": "ISO 3166-2 region code, e.g. us-ca, us-ny, eu-de"
+    },
+    "retention_days": { "type": "integer", "minimum": 0, "maximum": 365 },
+    "created_by_user_id": { "$ref": "_common.schema.json#/$defs/Ulid" }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://larpchekr.app/schemas/user.schema.json",
+  "title": "User",
+  "type": "object",
+  "required": ["id", "email", "display_name", "created_at"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "$ref": "_common.schema.json#/$defs/Ulid" },
+    "email": { "type": "string", "format": "email" },
+    "display_name": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "created_at": { "$ref": "_common.schema.json#/$defs/IsoTimestamp" },
+    "voice_calibration_id": {
+      "oneOf": [{ "$ref": "_common.schema.json#/$defs/Ulid" }, { "type": "null" }]
+    },
+    "github_login": {
+      "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }]
+    }
+  }
+}

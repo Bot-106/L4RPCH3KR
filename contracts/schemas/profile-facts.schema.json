@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://larpchekr.app/schemas/profile-facts.schema.json",
+  "title": "ProfileFacts",
+  "description": "Flattened, comparable facts extracted from a Profile. Used by the comparison engine.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "languages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "evidence"],
+        "properties": {
+          "name": { "type": "string" },
+          "evidence": { "$ref": "_common.schema.json#/$defs/ProfileSource" },
+          "confidence": { "$ref": "_common.schema.json#/$defs/Confidence" },
+          "loc": { "type": "integer", "minimum": 0 },
+          "first_seen_year": { "type": ["integer", "null"] }
+        }
+      }
+    },
+    "experience": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["company"],
+        "properties": {
+          "company": { "type": "string" },
+          "title": { "type": ["string", "null"] },
+          "start": { "type": ["string", "null"], "description": "YYYY-MM" },
+          "end": { "type": ["string", "null"], "description": "YYYY-MM or null if current" }
+        }
+      }
+    },
+    "education": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["school"],
+        "properties": {
+          "school": { "type": "string" },
+          "degree": { "type": ["string", "null"] },
+          "field": { "type": ["string", "null"] },
+          "end": { "type": ["string", "null"], "description": "YYYY" }
+        }
+      }
+    },
+    "projects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "url": { "type": ["string", "null"], "format": "uri" },
+          "stars": { "type": ["integer", "null"], "minimum": 0 }
+        }
+      }
+    },
+    "credentials": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "issuer": { "type": ["string", "null"] }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://larpchekr.app/schemas/ws-events.schema.json",
+  "title": "WsEventPayloads",
+  "description": "Per-`type` payload schemas. The full message wraps these in WsEnvelope.",
+  "$defs": {
+    "PiHello": {
+      "type": "object",
+      "required": ["device_id", "firmware_version"],
+      "properties": {
+        "device_id": { "type": "string" },
+        "firmware_version": { "type": "string" },
+        "battery_pct": { "type": ["integer", "null"], "minimum": 0, "maximum": 100 }
+      }
+    },
+    "PhoneHello": {
+      "type": "object",
+      "required": ["user_id", "app_version"],
+      "properties": {
+        "user_id": { "$ref": "_common.schema.json#/$defs/Ulid" },
+        "app_version": { "type": "string" }
+      }
+    },
+    "AudioMeta": {
+      "type": "object",
+      "required": ["sample_rate", "encoding", "channels", "frame_ms"],
+      "properties": {
+        "sample_rate": { "type": "integer", "enum": [16000] },
+        "encoding": { "type": "string", "enum": ["pcm_s16le"] },
+        "channels": { "type": "integer", "enum": [1] },
+        "frame_ms": { "type": "integer", "enum": [250] },
+        "speaker_hint": { "$ref": "_common.schema.json#/$defs/Speaker" }
+      }
+    },
+    "FrameSnapshot": {
+      "type": "object",
+      "required": ["image_b64", "width", "height"],
+      "properties": {
+        "image_b64": { "type": "string", "contentEncoding": "base64", "contentMediaType": "image/jpeg" },
+        "width": { "type": "integer", "maximum": 640 },
+        "height": { "type": "integer", "maximum": 480 }
+      }
+    },
+    "Heartbeat": {
+      "type": "object",
+      "required": ["battery_pct", "cpu_temp_c", "buffer_seconds"],
+      "properties": {
+        "battery_pct": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "cpu_temp_c": { "type": "number" },
+        "buffer_seconds": { "type": "number", "minimum": 0 }
+      }
+    },
+    "HapticPulse": {
+      "type": "object",
+      "required": ["severity", "pattern"],
+      "properties": {
+        "severity": { "$ref": "_common.schema.json#/$defs/Severity" },
+        "pattern": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 1, "maximum": 5000 },
+          "minItems": 1,
+          "maxItems": 16
+        }
+      }
+    },
+    "RecordingIndicator": {
+      "type": "object",
+      "required": ["state"],
+      "properties": {
+        "state": { "type": "string", "enum": ["off", "armed", "recording"] }
+      }
+    },
+    "SubscribeSession": {
+      "type": "object",
+      "required": ["session_id"],
+      "properties": { "session_id": { "$ref": "_common.schema.json#/$defs/Ulid" } }
+    },
+    "ConsumePairingQr": {
+      "type": "object",
+      "required": ["token"],
+      "properties": { "token": { "type": "string", "minLength": 8 } }
+    },
+    "PairingQr": {
+      "type": "object",
+      "required": ["token", "expires_at", "qr_url"],
+      "properties": {
+        "token": { "type": "string" },
+        "expires_at": { "$ref": "_common.schema.json#/$defs/IsoTimestamp" },
+        "qr_url": { "type": "string", "format": "uri" }
+      }
+    },
+    "TranscriptUpdate": {
+      "type": "object",
+      "required": ["session_id", "utterances"],
+      "properties": {
+        "session_id": { "$ref": "_common.schema.json#/$defs/Ulid" },
+        "utterances": { "type": "array", "items": { "$ref": "utterance.schema.json" } }
+      }
+    },
+    "ClaimDetected": {
+      "type": "object",
+      "required": ["session_id", "claim"],
+      "properties": {
+        "session_id": { "$ref": "_common.schema.json#/$defs/Ulid" },
+        "claim": { "$ref": "claim.schema.json" }
+      }
+    },
+    "FlagRaised": {
+      "type": "object",
+      "required": ["session_id", "flag", "claim", "utterance"],
+      "properties": {
+        "session_id": { "$ref": "_common.schema.json#/$defs/Ulid" },
+        "flag": { "$ref": "flag.schema.json" },
+        "claim": { "$ref": "claim.schema.json" },
+        "utterance": { "$ref": "utterance.schema.json" }
+      }
+    },
+    "ScoreUpdate": {
+      "type": "object",
+      "required": ["session_id", "score"],
+      "properties": {
+        "session_id": { "$ref": "_common.schema.json#/$defs/Ulid" },
+        "score": { "$ref": "_common.schema.json#/$defs/Confidence" }
+      }
+    },
+    "SessionStatus": {
+      "type": "object",
+      "required": ["session_id", "status"],
+      "properties": {
+        "session_id": { "$ref": "_common.schema.json#/$defs/Ulid" },
+        "status": { "type": "string", "enum": ["armed", "active", "ended"] },
+        "partner": {
+          "oneOf": [{ "$ref": "attendee.schema.json" }, { "type": "null" }]
+        }
+      }
+    },
+    "ErrorPayload": {
+      "type": "object",
+      "required": ["code", "message"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "auth_invalid",
+            "session_not_found",
+            "session_already_started",
+            "pairing_token_expired",
+            "pairing_token_consumed",
+            "unsupported_event_type",
+            "rate_limited",
+            "internal_error"
+          ]
+        },
+        "message": { "type": "string" },
+        "details": { "type": "object" }
+      }
+    }
+  }
+}

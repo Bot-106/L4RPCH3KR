@@ -1,0 +1,11 @@
+{
+  "name": "larpchekr",
+  "displayName": "L4RPCH3KR",
+  "ios": {
+    "bundleIdentifier": "app.larpchekr.phone"
+  },
+  "android": {
+    "package": "app.larpchekr.phone"
+  },
+  "scheme": "larpchekr"
+}

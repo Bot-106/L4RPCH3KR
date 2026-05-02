@@ -1,0 +1,64 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Env
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+.expo/
+.expo-shared/
+
+# React Native
+ios/Pods/
+ios/build/
+android/build/
+android/app/build/
+android/.gradle/
+*.jks
+*.keystore
+!debug.keystore
+
+# Test artifacts
+coverage/
+.nyc_output/
+
+# Generated
+contracts/generated/
+
+# Audio/video captures (never commit)
+*.wav
+*.mp3
+*.mp4
+*.flac
+captures/
+
+# Secrets
+*.pem
+*.key
+secrets/

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://larpchekr.app/schemas/profile.schema.json",
+  "title": "Profile",
+  "type": "object",
+  "required": ["id", "attendee_id", "source", "fetched_at", "data", "facts"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "$ref": "_common.schema.json#/$defs/Ulid" },
+    "attendee_id": { "$ref": "_common.schema.json#/$defs/Ulid" },
+    "source": { "$ref": "_common.schema.json#/$defs/ProfileSource" },
+    "fetched_at": { "$ref": "_common.schema.json#/$defs/IsoTimestamp" },
+    "data": { "type": "object", "description": "Source-specific raw payload." },
+    "facts": { "$ref": "profile-facts.schema.json" }
+  }
+}

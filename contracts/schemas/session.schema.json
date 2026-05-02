@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://larpchekr.app/schemas/session.schema.json",
+  "title": "Session",
+  "type": "object",
+  "required": ["id", "event_id", "self_user_id", "partner_consent_status", "started_at", "pi_device_id"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "$ref": "_common.schema.json#/$defs/Ulid" },
+    "event_id": { "$ref": "_common.schema.json#/$defs/Ulid" },
+    "self_user_id": { "$ref": "_common.schema.json#/$defs/Ulid" },
+    "partner_attendee_id": {
+      "oneOf": [{ "$ref": "_common.schema.json#/$defs/Ulid" }, { "type": "null" }]
+    },
+    "partner_consent_status": { "$ref": "_common.schema.json#/$defs/ConsentStatus" },
+    "started_at": { "$ref": "_common.schema.json#/$defs/IsoTimestamp" },
+    "ended_at": {
+      "oneOf": [{ "$ref": "_common.schema.json#/$defs/IsoTimestamp" }, { "type": "null" }]
+    },
+    "pi_device_id": { "type": "string", "minLength": 1 }
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://larpchekr.app/schemas/attendee.schema.json",
+  "title": "Attendee",
+  "type": "object",
+  "required": ["id", "event_id", "full_name", "email", "consented_to_recording", "imported_at"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "$ref": "_common.schema.json#/$defs/Ulid" },
+    "event_id": { "$ref": "_common.schema.json#/$defs/Ulid" },
+    "user_id": {
+      "oneOf": [{ "$ref": "_common.schema.json#/$defs/Ulid" }, { "type": "null" }]
+    },
+    "full_name": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "email": { "type": "string", "format": "email" },
+    "headline": { "type": ["string", "null"], "maxLength": 200 },
+    "linkedin_url": { "type": ["string", "null"], "format": "uri" },
+    "github_login": { "type": ["string", "null"] },
+    "resume_url": { "type": ["string", "null"], "format": "uri" },
+    "photo_url": { "type": ["string", "null"], "format": "uri" },
+    "consented_to_recording": { "type": "boolean" },
+    "imported_at": { "$ref": "_common.schema.json#/$defs/IsoTimestamp" },
+    "deleted_at": {
+      "oneOf": [{ "$ref": "_common.schema.json#/$defs/IsoTimestamp" }, { "type": "null" }]
+    }
+  }
+}

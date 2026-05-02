@@ -1,0 +1,94 @@
+{
+  "$description": "Placeholder design tokens. Replace this file with tokens.json exported from Figma (Tokens Studio plugin). Engineering imports from tokens.json; this example is the schema reference only.",
+  "color": {
+    "bg": {
+      "canvas":   { "$value": "#0A0A0B", "$type": "color" },
+      "surface":  { "$value": "#141416", "$type": "color" },
+      "raised":   { "$value": "#1C1C1F", "$type": "color" }
+    },
+    "text": {
+      "primary":   { "$value": "#F5F5F6", "$type": "color" },
+      "secondary": { "$value": "#A1A1A8", "$type": "color" },
+      "muted":     { "$value": "#5A5A62", "$type": "color" },
+      "inverse":   { "$value": "#0A0A0B", "$type": "color" }
+    },
+    "border": {
+      "default": { "$value": "#27272B", "$type": "color" },
+      "strong":  { "$value": "#3D3D43", "$type": "color" }
+    },
+    "accent": {
+      "default": { "$value": "#7C5CFF", "$type": "color" },
+      "strong":  { "$value": "#5B3CE6", "$type": "color" }
+    },
+    "severity": {
+      "low":    { "$value": "#FFD166", "$type": "color" },
+      "medium": { "$value": "#FF8A4C", "$type": "color" },
+      "high":   { "$value": "#FF4D4D", "$type": "color" }
+    },
+    "status": {
+      "recording": { "$value": "#FF4D4D", "$type": "color" },
+      "armed":     { "$value": "#7C5CFF", "$type": "color" },
+      "offline":   { "$value": "#5A5A62", "$type": "color" }
+    }
+  },
+  "font": {
+    "family": {
+      "sans": { "$value": "Inter, system-ui, sans-serif", "$type": "fontFamily" },
+      "mono": { "$value": "JetBrainsMono, ui-monospace, monospace", "$type": "fontFamily" }
+    },
+    "size": {
+      "xs":  { "$value": 12, "$type": "dimension" },
+      "sm":  { "$value": 14, "$type": "dimension" },
+      "md":  { "$value": 16, "$type": "dimension" },
+      "lg":  { "$value": 18, "$type": "dimension" },
+      "xl":  { "$value": 22, "$type": "dimension" },
+      "2xl": { "$value": 28, "$type": "dimension" },
+      "3xl": { "$value": 36, "$type": "dimension" }
+    },
+    "weight": {
+      "regular":  { "$value": 400, "$type": "fontWeight" },
+      "medium":   { "$value": 500, "$type": "fontWeight" },
+      "semibold": { "$value": 600, "$type": "fontWeight" },
+      "bold":     { "$value": 700, "$type": "fontWeight" }
+    },
+    "lineHeight": {
+      "tight":   { "$value": 1.2, "$type": "number" },
+      "normal":  { "$value": 1.45, "$type": "number" },
+      "relaxed": { "$value": 1.6, "$type": "number" }
+    }
+  },
+  "spacing": {
+    "0":  { "$value": 0,  "$type": "dimension" },
+    "1":  { "$value": 4,  "$type": "dimension" },
+    "2":  { "$value": 8,  "$type": "dimension" },
+    "3":  { "$value": 12, "$type": "dimension" },
+    "4":  { "$value": 16, "$type": "dimension" },
+    "6":  { "$value": 24, "$type": "dimension" },
+    "8":  { "$value": 32, "$type": "dimension" },
+    "12": { "$value": 48, "$type": "dimension" },
+    "16": { "$value": 64, "$type": "dimension" },
+    "24": { "$value": 96, "$type": "dimension" }
+  },
+  "radius": {
+    "sm":   { "$value": 6,   "$type": "dimension" },
+    "md":   { "$value": 10,  "$type": "dimension" },
+    "lg":   { "$value": 16,  "$type": "dimension" },
+    "full": { "$value": 999, "$type": "dimension" }
+  },
+  "shadow": {
+    "sm": { "$value": { "x": 0, "y": 1, "blur": 2,  "color": "#000000", "opacity": 0.2 }, "$type": "shadow" },
+    "md": { "$value": { "x": 0, "y": 4, "blur": 12, "color": "#000000", "opacity": 0.25 }, "$type": "shadow" },
+    "lg": { "$value": { "x": 0, "y": 12, "blur": 32, "color": "#000000", "opacity": 0.35 }, "$type": "shadow" }
+  },
+  "motion": {
+    "duration": {
+      "fast":   { "$value": 120, "$type": "duration" },
+      "normal": { "$value": 240, "$type": "duration" },
+      "slow":   { "$value": 480, "$type": "duration" }
+    },
+    "easing": {
+      "standard":   { "$value": [0.2, 0.0, 0.0, 1.0], "$type": "cubicBezier" },
+      "emphasized": { "$value": [0.3, 0.0, 0.8, 0.15], "$type": "cubicBezier" }
+    }
+  }
+}

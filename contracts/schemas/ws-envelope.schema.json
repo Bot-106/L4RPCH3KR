@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://larpchekr.app/schemas/ws-envelope.schema.json",
+  "title": "WsEnvelope",
+  "type": "object",
+  "required": ["id", "type", "ts", "data"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "type": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "ts": { "$ref": "_common.schema.json#/$defs/IsoTimestamp" },
+    "session_id": {
+      "oneOf": [{ "$ref": "_common.schema.json#/$defs/Ulid" }, { "type": "null" }]
+    },
+    "data": { "type": "object" }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://larpchekr.app/schemas/flag.schema.json",
+  "title": "Flag",
+  "type": "object",
+  "required": ["id", "claim_id", "profile_id", "severity", "score_delta", "verified_text", "confidence", "created_at", "disputed"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "$ref": "_common.schema.json#/$defs/Ulid" },
+    "claim_id": { "$ref": "_common.schema.json#/$defs/Ulid" },
+    "profile_id": { "$ref": "_common.schema.json#/$defs/Ulid" },
+    "severity": { "$ref": "_common.schema.json#/$defs/Severity" },
+    "score_delta": { "type": "number", "minimum": 0, "maximum": 1 },
+    "verified_text": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "confidence": { "$ref": "_common.schema.json#/$defs/Confidence" },
+    "created_at": { "$ref": "_common.schema.json#/$defs/IsoTimestamp" },
+    "disputed": { "type": "boolean" },
+    "dispute_reason": { "type": ["string", "null"], "maxLength": 1000 }
+  }
+}
