@@ -46,6 +46,9 @@ SPEECH_RATIO = 0.4  # fraction of sub-frames that must be speech
 # How many consecutive silent frames before we stop sending
 HANGOVER_FRAMES = 8  # 8 × 250ms = 2s hangover
 
+# Force transcription flush when VAD is stuck in speech (noisy environment)
+MAX_SEGMENT_BYTES = SAMPLE_RATE * BYTES_PER_SAMPLE * 10  # 10s × 32000 B/s
+
 SendEnvelopeFn = Callable[[dict], Awaitable[None]]
 TranscriptCallback = Callable[[str], None]
 
@@ -204,6 +207,33 @@ class AudioCapture:
                         speech_pcm.clear()
                         log.debug("audio: speech started")
                     speech_pcm.extend(pcm)
+                    # Safety flush: VAD can get stuck at 100% in noisy environments.
+                    # Force transcription after MAX_SEGMENT_BYTES so audio never
+                    # accumulates indefinitely without producing a transcript.
+                    if len(speech_pcm) >= MAX_SEGMENT_BYTES:
+                        log.debug("audio: max segment reached — flushing %d bytes", len(speech_pcm))
+                        captured = bytes(speech_pcm)
+                        speech_pcm.clear()
+                        speaking = False
+                        silent_count = 0
+                        transcriber = self._get_transcriber()
+                        try:
+                            text = await asyncio.wait_for(
+                                loop.run_in_executor(None, transcriber.transcribe, captured),
+                                timeout=45.0,
+                            )
+                        except asyncio.TimeoutError:
+                            log.warning("audio: transcription timed out — skipping segment")
+                            text = None
+                        if text:
+                            log.info("audio: transcript → %s", text[:80])
+                            if on_transcript:
+                                on_transcript(text)
+                            await send_envelope(
+                                _make_browser_transcript_envelope(text, session_id)
+                            )
+                        else:
+                            log.debug("audio: transcription returned empty")
                 else:
                     if speaking:
                         speech_pcm.extend(pcm)  # include trailing frame in segment
@@ -217,9 +247,14 @@ class AudioCapture:
                             captured = bytes(speech_pcm)
                             speech_pcm.clear()
                             transcriber = self._get_transcriber()
-                            text = await loop.run_in_executor(
-                                None, transcriber.transcribe, captured
-                            )
+                            try:
+                                text = await asyncio.wait_for(
+                                    loop.run_in_executor(None, transcriber.transcribe, captured),
+                                    timeout=45.0,
+                                )
+                            except asyncio.TimeoutError:
+                                log.warning("audio: transcription timed out — skipping segment")
+                                text = None
                             if text:
                                 log.info("audio: transcript → %s", text[:80])
                                 if on_transcript:

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # start-pi.sh — run on the Raspberry Pi (100.125.43.120)
-# Kills any existing larpchekr process, then restarts it.
+# Kills any existing larpchekr process, rotates the log, then restarts.
 # Usage:
 #   ./scripts/start-pi.sh               # real hardware
 #   ./scripts/start-pi.sh --fake        # fake hardware (dev/test mode)
@@ -38,14 +38,32 @@ if [[ -z "${LARPCHEKR_PI_TOKEN_PATH:-}" ]]; then
 fi
 export LARPCHEKR_PI_TOKEN_PATH
 
-# ── stop existing process ─────────────────────────────────────────────────────
+# ── stop existing process(es) ─────────────────────────────────────────────────
+# pkill may return 1 if nothing was running — that's fine.
 if pkill -f "larpchekr.main" 2>/dev/null; then
-  log "Stopped existing larpchekr process."
-  sleep 1
+  log "Stopped existing larpchekr process(es)."
+  sleep 2   # give ALSA/camera time to release before reopen
+fi
+# Hard-kill anything that survived SIGTERM
+pkill -9 -f "larpchekr.main" 2>/dev/null || true
+
+# ── mic gain: 62% (21 dB) — 100% (30 dB) causes VAD false positives ──────────
+# The USB camera mic noise floor at max gain fools webrtcvad into treating all
+# ambient audio as speech, so the hangover never fires and Whisper never runs.
+if amixer sset 'Mic' 10 &>/dev/null; then
+  log "Mic capture gain → 10/16  (62%  21 dB)"
+else
+  log "WARNING: could not set mic gain (amixer not available or no Mic control)"
 fi
 
-# ── start ─────────────────────────────────────────────────────────────────────
+# ── log rotation ──────────────────────────────────────────────────────────────
 LOG_FILE="$REPO/pi/larpchekr.log"
+if [[ -s "$LOG_FILE" ]]; then
+  mv "$LOG_FILE" "${LOG_FILE%.log}.$(date +%Y%m%d-%H%M%S).log"
+  log "Rotated previous log."
+fi
+
+# ── venv / deps ───────────────────────────────────────────────────────────────
 cd "$REPO/pi"
 
 if [[ ! -d .venv ]]; then
@@ -53,7 +71,6 @@ if [[ ! -d .venv ]]; then
   python3 -m venv .venv
 fi
 
-# Check that all critical packages are present; reinstall if any are missing.
 _MISSING=0
 for _pkg in dotenv websockets faster_whisper; do
   if ! .venv/bin/python -c "import $_pkg" &>/dev/null 2>&1; then
@@ -67,6 +84,7 @@ if [[ $_MISSING -eq 1 ]]; then
 fi
 unset _pkg _MISSING
 
+# ── start ─────────────────────────────────────────────────────────────────────
 if [[ $FAKE -eq 1 ]]; then
   export LARPCHEKR_FAKE_HARDWARE=1
   log "Starting larpchekr in FAKE hardware mode (no GPIO, mic, or camera)..."
@@ -75,13 +93,13 @@ else
   log "Starting larpchekr with real hardware..."
 fi
 
-nohup .venv/bin/python -m larpchekr.main >> "$LOG_FILE" 2>&1 &
+nohup .venv/bin/python -m larpchekr.main > "$LOG_FILE" 2>&1 &
 PID=$!
 
 log "larpchekr pid=$PID — log: pi/larpchekr.log"
-log "Tailing log for 5s to confirm startup..."
-sleep 5
-tail -20 "$LOG_FILE"
+log "Tailing log for 8s to confirm startup..."
+sleep 8
+tail -25 "$LOG_FILE"
 
 # ── summary ───────────────────────────────────────────────────────────────────
 log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

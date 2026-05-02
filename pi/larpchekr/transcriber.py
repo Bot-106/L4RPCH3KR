@@ -62,7 +62,7 @@ class Transcriber:
                 beam_size=1,
                 best_of=1,
                 temperature=0,
-                vad_filter=False,  # we already do VAD upstream
+                vad_filter=True,  # silero VAD skips noise/silence frames
             )
             text = " ".join(s.text for s in segments).strip()
             return text if text else None

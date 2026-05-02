@@ -22,13 +22,18 @@ _INDEX_HTML = b"""<!doctype html>
     #hdr{padding:10px 14px;background:#111;border-bottom:1px solid #1e1e1e;display:flex;align-items:center;gap:10px}
     #hdr h1{font-size:12px;letter-spacing:3px;color:#555;text-transform:uppercase}
     #stream-wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:12px;background:#0a0a0a}
-    #stream{max-width:100%;max-height:70vh;border:1px solid #1e1e1e;display:block}
+    #stream{max-width:100%;max-height:60vh;border:1px solid #1e1e1e;display:block}
     #bar{padding:10px 14px;background:#111;border-top:1px solid #1e1e1e;display:flex;align-items:center;gap:10px}
     #dot{width:10px;height:10px;border-radius:50%;background:#333;flex-shrink:0;transition:background .4s}
     #phase{font-size:12px;font-weight:bold;letter-spacing:2px;text-transform:uppercase;transition:color .4s}
     #sep{color:#333;font-size:12px}
     #detail{font-size:11px;color:#555;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     #ts{font-size:10px;color:#333;margin-left:auto}
+    #tx-panel{padding:14px 14px 18px;background:#0d0d0d;border-top:1px solid #1e1e1e}
+    #tx-label{font-size:9px;color:#444;letter-spacing:2px;text-transform:uppercase;display:block;margin-bottom:8px}
+    #tx{font-size:14px;color:#ddd;line-height:1.65;word-break:break-word;white-space:pre-wrap;min-height:1.65em;transition:opacity .3s}
+    #tx.fresh{opacity:1}
+    #tx.stale{opacity:.45}
   </style>
 </head>
 <body>
@@ -43,9 +48,14 @@ _INDEX_HTML = b"""<!doctype html>
     <span id="detail"></span>
     <span id="ts"></span>
   </div>
+  <div id="tx-panel">
+    <span id="tx-label">TRANSCRIPT</span>
+    <p id="tx" class="stale"></p>
+  </div>
   <script>
     const COLORS={armed:'#00cc55',recording:'#00ff77',pairing:'#3399ff',scanning:'#3399ff',
       claimed:'#66bbff',connecting:'#555',starting:'#333',degraded:'#ffaa00',offline:'#ff4444'};
+    let lastTx='';
     async function poll(){
       try{
         const r=await fetch('/status');
@@ -56,6 +66,9 @@ _INDEX_HTML = b"""<!doctype html>
         ph.textContent=d.state; ph.style.color=c;
         document.getElementById('detail').textContent=d.detail||'';
         document.getElementById('ts').textContent=new Date().toLocaleTimeString();
+        const tx=document.getElementById('tx');
+        const t=d.transcript||'';
+        if(t!==lastTx){lastTx=t;tx.textContent=t;tx.className=t?'fresh':'stale';}
       }catch(e){}
     }
     poll(); setInterval(poll,2000);
@@ -144,18 +157,13 @@ class PreviewServer:
         self._face_detected = detected
 
     def set_last_transcript(self, text: str) -> None:
-        # Trim to fit within the 320px frame at small font
-        self._last_transcript = text[-72:] if len(text) > 72 else text
+        self._last_transcript = text
 
     def get_camera_overlay(self) -> "list[tuple[str, tuple[int, int, int]]]":
-        """Return overlay lines for the camera preview, bottom-up."""
-        lines = []
-        if self._last_transcript:
-            lines.append((self._last_transcript, (200, 200, 200)))
+        """Return overlay lines for the camera preview, bottom-up (face only)."""
         face_label = "FACE: YES" if self._face_detected else "FACE: NO"
         face_color = (50, 220, 50) if self._face_detected else (50, 50, 220)
-        lines.append((face_label, face_color))
-        return lines
+        return [(face_label, face_color)]
 
     def set_state(self, state: str, detail: str = "") -> None:
         """Must be called from the event loop thread."""
@@ -212,7 +220,11 @@ class PreviewServer:
         if path == "/stream":
             await self._handle_stream(writer)
         elif path == "/status":
-            body = json.dumps({"state": self._state, "detail": self._detail}).encode()
+            body = json.dumps({
+                "state": self._state,
+                "detail": self._detail,
+                "transcript": self._last_transcript,
+            }).encode()
             writer.write(
                 b"HTTP/1.1 200 OK\r\n"
                 b"Content-Type: application/json\r\n"
