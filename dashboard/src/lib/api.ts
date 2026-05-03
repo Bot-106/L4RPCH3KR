@@ -199,6 +199,30 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   const token = getToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
+  
+  // Send browser-stored API keys from cookies
+  if (typeof window !== "undefined") {
+    const { getApiKey } = await import("@/lib/api-keys");
+    const anthropicKey = getApiKey("anthropic");
+    const openaiKey = getApiKey("openai");
+    
+    // If anthropic key exists, send it with provider
+    if (anthropicKey) {
+      console.log("[API] Using Anthropic API key from browser:", anthropicKey.substring(0, 20) + "...");
+      headers.set("X-LLM-API-Key", anthropicKey);
+      headers.set("X-LLM-Provider", "anthropic");
+    }
+    // If openai key exists, send it with provider (takes precedence if both exist)
+    else if (openaiKey) {
+      console.log("[API] Using OpenAI API key from browser:", openaiKey.substring(0, 20) + "...");
+      headers.set("X-LLM-API-Key", openaiKey);
+      headers.set("X-LLM-Provider", "openai");
+    }
+    else {
+      console.log("[API] No API keys configured in browser");
+    }
+  }
+  
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers, cache: "no-store" });
   if (!res.ok) {
     const text = await res.text();

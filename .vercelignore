@@ -1,0 +1,13 @@
+pi/
+web-phone/
+scripts/
+infra/
+design/
+contracts/
+.git/
+node_modules/
+.env
+.env.local
+__pycache__/
+*.pyc
+.pytest_cache/

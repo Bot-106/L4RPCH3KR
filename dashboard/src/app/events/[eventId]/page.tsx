@@ -2,12 +2,15 @@
 
 import { use, useEffect, useMemo, useRef, useState } from "react";
 import { api, apiWsUrl, Attendee, AttendeeSummary, Event, EventStats, Flag, getToken, WsEnvelope } from "@/lib/api";
+import { useAdmin } from "@/app/footer";
 
 export default function EventPage({ params }: { params: Promise<{ eventId: string }> }) {
+  const { isAdmin } = useAdmin();
   const { eventId } = use(params);
   const [event, setEvent] = useState<Event | null>(null);
   const [stats, setStats] = useState<EventStats | null>(null);
   const [attendees, setAttendees] = useState<Attendee[]>([]);
+  const [ownedAttendeeIds, setOwnedAttendeeIds] = useState<Set<string>>(new Set());
   const [sort, setSort] = useState<keyof Attendee>("full_name");
   const [status, setStatus] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -23,6 +26,23 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
   const [exportHref, setExportHref] = useState(`${api.exportUrl(eventId)}?token=`);
 
   const sorted = useMemo(() => [...attendees].sort((a, b) => String(a[sort] ?? "").localeCompare(String(b[sort] ?? ""))), [attendees, sort]);
+
+  function canEditAttendee(attendeeId: string): boolean {
+    return isAdmin || ownedAttendeeIds.has(attendeeId);
+  }
+
+  function getLinkedInUsername(url: string | null | undefined): string {
+    if (!url) return "";
+    try {
+      const urlObj = new URL(url);
+      const pathname = urlObj.pathname.toLowerCase();
+      // Extract username from URLs like: linkedin.com/in/username or linkedin.com/company/name
+      const match = pathname.match(/\/(in|company)\/([^/?]+)/);
+      return match ? match[2].replace(/[/-]/g, " ") : url;
+    } catch {
+      return url;
+    }
+  }
 
   function isHttpUrl(value: string | null | undefined) {
     return typeof value === "string" && /^https?:\/\//.test(value) && !value.includes("<");
@@ -91,6 +111,7 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
         headline: createForm.headline.trim(),
       });
       setAttendees((rows) => [res.attendee, ...rows]);
+      setOwnedAttendeeIds((ids) => new Set([...ids, res.attendee.id]));
       setCreateForm({ full_name: "", email: "", github_login: "", linkedin_url: "", headline: "" });
       setCreateOpen(false);
       setStatus(`Created ${res.attendee.full_name}.`);
@@ -234,8 +255,8 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
           <a className="px-3 py-2" href="/events">EVENTS</a>
           <a className="px-3 py-2" href={`/leaderboard?event_id=${encodeURIComponent(eventId)}`}>LARPERBOARD</a>
           <a className="px-3 py-2" href={`/events/${eventId}/flags`}>FLAGS</a>
-          <a className="px-3 py-2" href={`/events/${eventId}/live`}>LIVE</a>
           <a className="px-3 py-2" href={exportHref}>EXPORT</a>
+          <a className="px-3 py-2" href="/settings">SETTINGS</a>
         </nav>
       </header>
       <div className="pixel-strip" />
@@ -247,17 +268,22 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
             <p className="text-stone-600">{event?.attendee_count ?? attendees.length} attendees · dashboard core</p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <a className="rounded-xl bg-orange-500 px-5 py-3 font-bold text-white" href={`/events/${eventId}/live`}>Laptop live check</a>
             <a className="rounded-xl bg-stone-950 px-5 py-3 font-bold text-white" href={exportHref}>Export CSV</a>
           </div>
         </div>
 
         <section className="mt-6 rounded-3xl border border-stone-300 bg-white p-5">
           <div className="flex flex-wrap items-center gap-4">
-            <label className="rounded-xl border border-dashed border-stone-400 px-5 py-3 font-bold">
-              Upload CSV
-              <input className="hidden" type="file" accept=".csv,text/csv" onChange={(e) => void upload(e.target.files?.[0])} />
-            </label>
+            {isAdmin ? (
+              <>
+                <label className="rounded-xl bg-stone-950 px-5 py-3 font-bold text-white cursor-pointer hover:bg-stone-900">
+                  Import CSV
+                  <input type="file" accept=".csv" onChange={(e) => void upload(e.currentTarget.files?.[0])} className="hidden" />
+                </label>
+              </>
+            ) : (
+              <p className="rounded-xl border border-dashed border-stone-400 px-5 py-3 font-bold text-stone-600">CSV import disabled - Contact organizer if you are a hackathon organizer</p>
+            )}
             <button
               className="rounded-xl bg-stone-950 px-5 py-3 font-bold text-white"
               onClick={() => setCreateOpen((open) => !open)}
@@ -340,17 +366,16 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
         </section>
 
         <section className="mt-6 overflow-hidden rounded-3xl border border-stone-300 bg-white">
-          <div className="grid grid-cols-[1.4fr_0.8fr_0.6fr_0.8fr_1fr_1fr_0.7fr] gap-3 border-b border-stone-200 bg-stone-950 px-4 py-3 text-sm font-bold text-white">
+          <div className={`grid ${isAdmin ? "grid-cols-[1.4fr_0.8fr_0.6fr_0.8fr_1fr_0.4fr]" : "grid-cols-[1.4fr_0.8fr_0.6fr_0.8fr_1fr]"} gap-3 border-b border-stone-200 bg-stone-950 px-4 py-3 text-sm font-bold text-white`}>
             <button className="text-left" onClick={() => setSort("full_name")}>Name</button>
             <span>Larpometer™</span>
             <span>Flags</span>
             <span>GitHub</span>
             <span>LinkedIn</span>
-            <span>Status</span>
-            <span />
+            {isAdmin && <span>Action</span>}
           </div>
           {sorted.map((attendee) => (
-            <div key={attendee.id} className="grid grid-cols-[1.4fr_0.8fr_0.6fr_0.8fr_1fr_1fr_0.7fr] gap-3 border-b border-stone-200 px-4 py-3 text-sm">
+            <div key={attendee.id} className={`grid ${isAdmin ? "grid-cols-[1.4fr_0.8fr_0.6fr_0.8fr_1fr_0.4fr]" : "grid-cols-[1.4fr_0.8fr_0.6fr_0.8fr_1fr]"} gap-3 border-b border-stone-200 px-4 py-3 text-sm`}>
               <div className="flex items-center gap-3">
                 {attendee.profile_pic_url || attendee.photo_url ? (
                   <button className="relative h-10 w-10 shrink-0 rounded-full border border-stone-200" title="Fetch/update profile photo" onClick={() => void fetchPhoto(attendee)} disabled={photoLoading === attendee.id}>
@@ -364,13 +389,37 @@ export default function EventPage({ params }: { params: Promise<{ eventId: strin
               </div>
               <span className="rounded-lg bg-stone-100 px-2 py-1 font-bold">{larpometer(attendee.larp_score) == null ? "unavailable" : larpometer(attendee.larp_score)}</span>
               <span className="px-2 py-1 font-bold">{attendee.flag_count ?? 0}</span>
-              <input className="rounded-lg border border-stone-200 px-2 py-1" defaultValue={attendee.github_login ?? ""} onBlur={(e) => void update(attendee, "github_login", e.target.value)} />
+              {canEditAttendee(attendee.id) ? (
+                <input className="rounded-lg border border-stone-200 px-2 py-1" defaultValue={attendee.github_login ?? ""} onBlur={(e) => void update(attendee, "github_login", e.target.value)} />
+              ) : attendee.github_login ? (
+                <a href={`https://github.com/${attendee.github_login}`} target="_blank" rel="noreferrer" className="px-2 py-1 text-blue-600 hover:underline font-semibold">
+                  {attendee.github_login}
+                </a>
+              ) : (
+                <span className="px-2 py-1 text-stone-600">—</span>
+              )}
               <div className="flex min-w-0 items-center justify-end gap-2">
-                <input className="min-w-0 w-full max-w-[240px] rounded-lg border border-stone-200 px-2 py-1 text-right" defaultValue={attendee.linkedin_url ?? ""} placeholder="LinkedIn URL or img snippet" onBlur={(e) => e.target.value !== (attendee.linkedin_url ?? "") ? void update(attendee, "linkedin_url", e.target.value) : undefined} />
-                {isHttpUrl(attendee.linkedin_url) ? <a className="ml-auto rounded-lg bg-blue-50 px-2 py-1 font-bold text-blue-700 underline" href={attendee.linkedin_url ?? ""} target="_blank" rel="noreferrer">Open</a> : null}
+                {canEditAttendee(attendee.id) ? (
+                  <input className="min-w-0 w-full max-w-[240px] rounded-lg border border-stone-200 px-2 py-1 text-right" defaultValue={attendee.linkedin_url ?? ""} placeholder="LinkedIn URL or img snippet" onBlur={(e) => e.target.value !== (attendee.linkedin_url ?? "") ? void update(attendee, "linkedin_url", e.target.value) : undefined} />
+                ) : isHttpUrl(attendee.linkedin_url) ? (
+                  <a href={attendee.linkedin_url ?? ""} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline font-semibold">
+                    {getLinkedInUsername(attendee.linkedin_url)}
+                  </a>
+                ) : (
+                  <span className="text-right text-stone-600">—</span>
+                )}
               </div>
-              <span className="rounded-lg bg-emerald-50 px-2 py-1 font-bold text-emerald-800">{attendee.processing_status ?? "ready"}</span>
-              <button className="rounded-lg bg-red-50 px-3 py-1 font-bold text-red-700" onClick={() => void remove(attendee)}>Delete</button>
+              {isAdmin && (
+                <div className="flex items-center justify-center">
+                  <button
+                    className="rounded-lg bg-red-100 px-2 py-1 text-xs font-bold text-red-700 hover:bg-red-200"
+                    onClick={() => void remove(attendee)}
+                    title="Delete attendee"
+                  >
+                    Delete
+                  </button>
+                </div>
+              )}
             </div>
           ))}
           {!loading && sorted.length === 0 ? <p className="p-6 text-sm text-stone-600">No attendees yet. Upload a CSV to populate this event.</p> : null}

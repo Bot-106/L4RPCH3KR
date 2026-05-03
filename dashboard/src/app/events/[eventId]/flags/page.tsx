@@ -53,8 +53,11 @@ export default function FlagsPage({ params }: { params: Promise<{ eventId: strin
       </header>
       <div className="pixel-strip" />
 
-      <section className="mx-auto mt-10 max-w-6xl border-2 border-black bg-white">
-        <div className="flex items-center justify-between bg-black px-6 py-5 text-white">
+      <section className="mx-auto mt-10 max-w-6xl">
+        <div className="rounded-lg border-2 border-yellow-500 bg-yellow-50 p-4 mb-4 text-center">
+          <p className="text-sm font-bold text-yellow-800">⚠️ Flags are not being updated in real-time as this requires our hardware integration.</p>
+        </div>
+        <div className="flex items-center justify-between bg-black px-6 py-5 text-white border-2 border-black rounded-t-lg">
           <h1 className="text-2xl">RECENT FLAGS</h1>
           <span className="text-xs text-stone-300">LIVE FEED</span>
         </div>

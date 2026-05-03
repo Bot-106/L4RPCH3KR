@@ -98,6 +98,7 @@ export default function GlobalLeaderboardPage() {
           <a className="px-3 py-2" href="/events">EVENTS</a>
           {eventId ? <a className="px-3 py-2" href={`/events/${eventId}`}>ATTENDEES</a> : null}
           {eventId ? <a className="px-3 py-2" href={`/events/${eventId}/flags`}>FLAGS</a> : null}
+          <a className="px-3 py-2" href="/settings">SETTINGS</a>
         </nav>
       </header>
       <div className="pixel-strip" />

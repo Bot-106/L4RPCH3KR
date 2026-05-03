@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "projects": [
+    {
+      "name": "larpchekr-dashboard",
+      "path": "dashboard"
+    },
+    {
+      "name": "larpchekr-backend",
+      "path": "backend"
+    }
+  ],
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next"
+}

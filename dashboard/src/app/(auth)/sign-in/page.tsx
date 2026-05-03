@@ -4,14 +4,13 @@ import { FormEvent, useState } from "react";
 import { api, setToken } from "@/lib/api";
 
 export default function SignInPage() {
-  const [email, setEmail] = useState("organizer@example.com");
   const [error, setError] = useState<string | null>(null);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setError(null);
     try {
-      const res = await api.signIn(email);
+      const res = await api.signIn("organizer@larpchekr.app");
       setToken(res.jwt);
       window.location.href = "/events";
     } catch (err) {
@@ -25,8 +24,7 @@ export default function SignInPage() {
         <p className="text-sm font-bold uppercase text-stone-600">L4RPCH3KR</p>
         <h1 className="mt-3 text-3xl font-black">ORGANIZER SIGN-IN</h1>
         <p className="mt-2 text-sm text-stone-600">Magic-link stub for day-one dashboard integration.</p>
-        <input className="mt-6 w-full rounded-xl border border-stone-300 px-4 py-3" value={email} onChange={(e) => setEmail(e.target.value)} type="email" />
-        <button className="mt-4 w-full px-4 py-3 font-bold">Continue</button>
+        <button className="mt-6 w-full px-4 py-3 font-bold">Sign In</button>
         {error ? <p className="mt-4 text-sm text-red-700">{error}</p> : null}
       </form>
     </main>

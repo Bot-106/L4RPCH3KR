@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { api, Event } from "@/lib/api";
+import { useAdmin } from "../footer";
 
 export default function EventsPage() {
+  const { isAdmin } = useAdmin();
   const [events, setEvents] = useState<Event[]>([]);
   const [name, setName] = useState("Demo Hackathon");
   const [error, setError] = useState<string | null>(null);
@@ -66,16 +68,19 @@ export default function EventsPage() {
           <span className="bg-white px-3 py-2 text-black">EVENTS</span>
           <a className="px-3 py-2 text-white" href="/leaderboard">LARPERBOARD</a>
           <span className="px-3 py-2 text-white">FLAGS</span>
+          <a className="px-3 py-2 text-white" href="/settings">SETTINGS</a>
         </nav>
       </header>
       <div className="pixel-strip" />
       <div className="mx-auto max-w-5xl p-10">
         <h1 className="text-4xl font-black tracking-tight">EVENTS</h1>
         <p className="mt-3 text-stone-600">Pick an event, import attendees, and export the enriched CSV.</p>
-        <form onSubmit={create} className="mt-8 flex gap-3 border border-stone-300 bg-white p-4">
-          <input className="flex-1 rounded-xl border border-stone-300 px-4 py-3" value={name} onChange={(e) => setName(e.target.value)} aria-label="Event name" />
-          <button className="px-5 py-3 font-bold">Create event</button>
-        </form>
+        {isAdmin && (
+          <form onSubmit={create} className="mt-8 flex gap-3 border border-stone-300 bg-white p-4">
+            <input className="flex-1 rounded-xl border border-stone-300 px-4 py-3" value={name} onChange={(e) => setName(e.target.value)} aria-label="Event name" />
+            <button className="px-5 py-3 font-bold">Create event</button>
+          </form>
+        )}
         {loading ? <p className="mt-8">Loading events...</p> : null}
         {error ? <p className="mt-8 rounded-xl bg-red-100 p-4 text-red-800">{error}</p> : null}
         {!loading && events.length === 0 ? (

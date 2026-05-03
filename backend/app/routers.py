@@ -5,7 +5,7 @@ import secrets
 from datetime import datetime, timedelta
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
@@ -15,6 +15,7 @@ from app.config import settings
 from app.db import get_db
 from app.deps import current_user, organizer_user
 from app.identity.face_matcher import face_matcher
+from app.llm_keys import get_anthropic_api_key
 from app.pipeline.score import compute_score, score_label
 
 router = APIRouter()
@@ -478,7 +479,7 @@ async def fetch_attendee_profile_photo(event_id: str, attendee_id: str, db: Asyn
 
 
 @router.get("/events/{event_id}/attendees/{attendee_id}/summary")
-async def attendee_summary(event_id: str, attendee_id: str, refresh: bool = False, db: AsyncIOMotorDatabase = Depends(get_db), _: dict = Depends(current_user)) -> dict:
+async def attendee_summary(event_id: str, attendee_id: str, refresh: bool = False, request: Request = None, db: AsyncIOMotorDatabase = Depends(get_db), _: dict = Depends(current_user)) -> dict:
     import httpx
     import json
     from dotenv import dotenv_values
@@ -514,11 +515,6 @@ async def attendee_summary(event_id: str, attendee_id: str, refresh: bool = Fals
             "profile_summary_cached_at": attendee.get("profile_summary_cached_at"),
         }
 
-    print(f"\n{'='*60}")
-    print(f"[SUMMARY] attendee={attendee.get('full_name')} id={attendee_id}")
-    print(f"[SUMMARY] github_login={attendee.get('github_login')} linkedin_url={attendee.get('linkedin_url')}")
-    print(f"{'='*60}\n")
-
     env_path = Path(__file__).resolve().parents[2] / ".env"
     env_values = dotenv_values(env_path)
     github_token = env_values.get("GITHUB_TOKEN") or env_values.get("GITHUB_PAT")
@@ -536,7 +532,6 @@ async def attendee_summary(event_id: str, attendee_id: str, refresh: bool = Fals
                     f"https://api.github.com/users/{github_login}",
                     headers=github_headers,
                 )
-                print(f"[GITHUB] GET /users/{github_login} → {user_resp.status_code}")
                 if user_resp.status_code == 200:
                     gh = user_resp.json()
                     github_data = {
@@ -550,7 +545,6 @@ async def attendee_summary(event_id: str, attendee_id: str, refresh: bool = Fals
                         "avatar_url": gh.get("avatar_url"),
                         "html_url": gh.get("html_url"),
                     }
-                    print(f"[GITHUB] data={json.dumps({k:v for k,v in github_data.items() if k!='avatar_url'}, indent=2)}")
 
                 owned_repos_resp = await client.get(
                     f"https://api.github.com/users/{github_login}/repos",
@@ -567,7 +561,6 @@ async def attendee_summary(event_id: str, attendee_id: str, refresh: bool = Fals
                     params={"per_page": 100},
                     headers=github_headers,
                 )
-                print(f"[GITHUB] GET owner repos → {owned_repos_resp.status_code}; member repos → {member_repos_resp.status_code}; orgs → {orgs_resp.status_code}")
                 if owned_repos_resp.status_code == 200:
                     repos = owned_repos_resp.json()
                     member_repos = member_repos_resp.json() if member_repos_resp.status_code == 200 else []
@@ -605,32 +598,20 @@ async def attendee_summary(event_id: str, attendee_id: str, refresh: bool = Fals
                         for org in orgs[:10]
                     ]
                     github_data["shared_repo_count"] = len(all_shared_repos)
-                    print(f"[GITHUB] top_languages={github_data['top_languages']}")
-                    print(f"[GITHUB] recent_repos={[r['name'] for r in github_data.get('recent_repos', [])]}")
-        except Exception as exc:
-            print(f"[GITHUB] ERROR: {exc}")
+        except Exception:
+            pass
 
     # ── LinkedIn ───────────────────────────────────────────────────────────────
     linkedin_data: dict = {}
     linkedin_url = attendee.get("linkedin_url") or (attendee.get("socials") or {}).get("linkedin")
-    print(f"[LINKEDIN] url={linkedin_url}")
     if linkedin_url and linkedin_url.startswith("http"):
         linkedin_data = await scrape_linkedin_profile(linkedin_url)
-        # Full debug dump of everything we scraped
-        print(f"[LINKEDIN] RAW RESULT:")
-        try:
-            safe = {k: v for k, v in linkedin_data.items() if k not in ("photoUrl",)}
-            print(json.dumps(safe, indent=2, default=str))
-        except Exception:
-            print(repr(linkedin_data))
     else:
-        print("[LINKEDIN] no URL — skipping scrape")
+        pass
 
     # ── Flags & verified profile ───────────────────────────────────────────────
     flags = dynamic["flags"]
     verified_profile = dynamic["verified_profile"]
-    print(f"[FLAGS] count={len(flags)}")
-    print(f"[VERIFIED_PROFILE] keys={list(verified_profile.keys())}")
 
     # ── MongoDB same-name matches ──────────────────────────────────────────────
     name_matches: list[dict] = []
@@ -644,8 +625,8 @@ async def attendee_summary(event_id: str, attendee_id: str, refresh: bool = Fals
                     "full_name": {"$regex": f"^{re.escape(attendee_name)}$", "$options": "i"},
                 }
             ).to_list(10)
-        except Exception as exc:
-            print(f"[NAME_MATCH] ERROR: {exc}")
+        except Exception:
+            pass
 
     name_match_summary = "\n".join(
         [
@@ -655,13 +636,10 @@ async def attendee_summary(event_id: str, attendee_id: str, refresh: bool = Fals
             for m in name_matches
         ]
     )
-    if name_match_summary:
-        print(f"[NAME_MATCH] found={len(name_matches)}")
 
     # ── Claude comparison ──────────────────────────────────────────────────────
     comparison: dict = {}
-    anthropic_key = env_values.get("ANTHROPIC_API_KEY") or settings.anthropic_api_key
-    print(f"[CLAUDE] key_present={bool(anthropic_key)} linkedin_scraped={linkedin_data.get('scraped')} github_login={github_data.get('login')}")
+    anthropic_key = get_anthropic_api_key(request)
 
     if anthropic_key and (linkedin_data.get("scraped") or github_data.get("login")):
         try:
@@ -719,14 +697,12 @@ Tasks — respond ONLY with a single JSON object, no markdown fences:
 8. "larp_score_reason": 1 sentence explaining that score.
 9. If name matches exist, factor in whether this attendee seems to be the same person or conflicting records (mention in discrepancies if conflicting)."""
 
-            print(f"[CLAUDE] calling claude-haiku-4-5 for extraction + comparison...")
             resp = client_ai.messages.create(
                 model="claude-haiku-4-5-20251001",
                 max_tokens=1200,
                 messages=[{"role": "user", "content": prompt}],
             )
             raw_resp = resp.content[0].text.strip()
-            print(f"[CLAUDE] raw response:\n{raw_resp}")
 
             json_match = re.search(r'\{.*\}', raw_resp, re.DOTALL)
             if json_match:
@@ -741,14 +717,11 @@ Tasks — respond ONLY with a single JSON object, no markdown fences:
                     linkedin_data["education"] = extracted["education"]
                 if extracted.get("skills"):
                     linkedin_data["skills"] = extracted["skills"]
-
-                print(f"[CLAUDE] credibility={comparison.get('credibility')} extracted_exp={len(linkedin_data.get('experiences', []))} skills={linkedin_data.get('skills', [])[:5]}")
             else:
                 comparison = {"linkedin_summary": raw_resp, "github_summary": "", "discrepancies": [], "credibility": "UNKNOWN", "credibility_reason": ""}
 
-        except Exception as exc:
-            print(f"[CLAUDE] ERROR: {exc}")
-            comparison = {"error": str(exc)}
+        except Exception:
+            pass
 
     from app.pipeline.score import calculate_profile_larp_score
     
@@ -780,8 +753,6 @@ Tasks — respond ONLY with a single JSON object, no markdown fences:
     )
     attendee = await db.attendees.find_one({"id": attendee_id, "event_id": event_id}) or attendee
     
-    print(f"\n[SUMMARY DONE] github_keys={list(github_data.keys())} linkedin_scraped={linkedin_data.get('scraped')} comparison_keys={list(comparison.keys())} profile_larp_score={profile_score}\n")
-
     return {
         "attendee": serializers.attendee(attendee),
         "github": github_data,
